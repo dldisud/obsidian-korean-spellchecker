@@ -1,0 +1,1 @@
+# obsidian-korean-spellchecker
