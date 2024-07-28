@@ -1,4 +1,3 @@
-# obsidian-korean-spellchecker
 # Obsidian 한국어 맞춤법/문법 검사기 플러그인
 
 이 플러그인은 Obsidian에서 한국어 텍스트의 맞춤법과 문법을 검사하는 기능을 제공합니다. [부산대학교 인공지능연구실](http://speller.cs.pusan.ac.kr/)에서 개발한 한국어 맞춤법/문법 검사기를 활용합니다.
@@ -12,11 +11,13 @@
 
 ## 설치 방법
 
-1. Obsidian의 설정(Settings)에서 '커뮤니티 플러그인(Community plugins)'으로 이동합니다.
-2. '안전 모드 해제(Turn on community plugins)'를 활성화합니다.
-3. '찾아보기(Browse)'를 클릭하고 "Korean Spellchecker"를 검색합니다.
-4. 플러그인을 찾으면 "설치(Install)" 버튼을 클릭합니다.
-5. 설치가 완료되면 플러그인을 활성화합니다.
+이 플러그인은 수동으로 설치해야 합니다. 다음 단계를 따라 설치를 진행하세요:
+
+1. 이 저장소의 Releases 페이지에서 최신 버전의 `manifest.json`, `main.js`, `styles.css` 파일을 다운로드합니다.
+2. Obsidian Vault의 플러그인 폴더에 새 폴더를 만듭니다: `VaultFolder/.obsidian/plugins/obsidian-korean-spellchecker/`
+3. 다운로드한 파일들을 새로 만든 폴더에 복사합니다.
+4. Obsidian을 재시작하거나 설정에서 플러그인을 새로고침합니다.
+5. 설정 > 커뮤니티 플러그인으로 이동하여 "한국어 맞춤법/문법 검사기"를 활성화합니다.
 
 ## 사용 방법
 
