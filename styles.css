@@ -1,0 +1,232 @@
+#correctionPopup {
+    position: fixed;
+    top: 10%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 95%;
+    height: 80%;
+    background: var(--background-primary);
+    z-index: 1000;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    box-shadow: var(--shadow-l);
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    color: var(--text-normal);
+    display: flex;
+    flex-direction: column;
+}
+#correctionPopup.light {
+    background: var(--background-primary);
+    color: var(--text-normal);
+}
+#correctionPopup.dark {
+    background: var(--background-primary);
+    color: var(--text-normal);
+}
+#correctionPopup .header {
+    padding: 10px 20px;
+    background: var(--background-secondary);
+    color: var(--text-normal);
+    border-bottom: 1px solid var(--background-modifier-border);
+    position: sticky;
+    top: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top-left-radius: var(--radius-m);
+    border-top-right-radius: var(--radius-m);
+    height: 56px;
+}
+#correctionPopup.dark .header {
+    background: var(--background-secondary-alt);
+}
+#correctionPopup .header h2 {
+    margin: 0;
+    font-size: 1.5em;
+    text-align: center;
+    flex-grow: 1;
+}
+#correctionPopup .preview-container {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding: 20px;
+    background: var(--background-primary);
+    position: sticky;
+    top: 56px;
+    max-height: 30vh;
+    overflow-y: auto;
+}
+#correctionPopup.light .preview-container {
+    background: var(--background-primary);
+}
+#correctionPopup.dark .preview-container {
+    background: var(--background-primary-alt);
+}
+#correctionPopup .error-text,
+#correctionPopup .result-preview {
+    flex: 1 1 100%;
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: var(--radius-s);
+    white-space: pre-wrap;
+    max-width: 100%;
+    overflow-wrap: break-word;
+}
+#correctionPopup .error-text {
+    background-color: rgba(255, 0, 0, 0.05);
+}
+#correctionPopup .result-preview {
+    background-color: rgba(0, 255, 0, 0.05);
+}
+#correctionPopup .arrow {
+    font-size: 1em;
+    color: var(--text-normal);
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    align-self: center;
+    flex: 0 1 auto;
+}
+#correctionPopup .content {
+    padding: 20px 20px 0 20px;
+    line-height: 1.6;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    flex-grow: 1;
+}
+#correctionPopup .content .correction-list {
+    flex: 1 1 100%;
+}
+#correctionPopup .content .correction-item {
+    margin-bottom: 10px;
+    padding: 10px;
+    background: var(--background-secondary-alt);
+    border-radius: var(--radius-s);
+}
+#correctionPopup .content .correction-item span {
+    color: var(--color-red);
+    font-weight: bold;
+}
+#correctionPopup .content .correction-item b {
+    font-weight: bold;
+}
+#correctionPopup .content .correction-item pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+#correctionPopup button {
+    padding: 8px 16px;
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: 1px solid var(--interactive-accent);
+    border-radius: var(--radius-s);
+    cursor: pointer;
+    font-size: 1em;
+}
+#correctionPopup button:hover {
+    background: var(--interactive-accent-hover);
+    border: 1px solid var(--interactive-accent-hover);
+}
+#correctionPopup .info-box {
+    color: var(--text-normal);
+    margin: 0 20px 20px 20px;
+    padding: 10px;
+    background-color: var(--background-secondary-alt);
+    border-radius: var(--radius-s);
+    font-size: 1.1em;
+    text-align: center;
+    box-sizing: border-box;
+}
+#correctionPopup label {
+    margin-right: 10px;
+}
+#correctionPopup input[type="text"] {
+    margin-top: 5px;
+    padding: 5px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    width: calc(100% - 120px);
+}
+.highlight {
+    background-color: var(--background-modifier-hover);
+}
+.correction-options {
+    display: flex;
+    align-items: center;
+}
+@media (min-width: 768px) {
+    #correctionPopup .error-text,
+    #correctionPopup .result-preview {
+        flex: 1 1 45%;
+        margin-bottom: 0;
+    }
+    #correctionPopup .result-preview {
+        margin-left: 0;
+    }
+    #correctionPopup .arrow {
+        transform: rotate(0deg);
+    }
+}
+@media (max-width: 767px) {
+    #correctionPopup .arrow {
+        transform: rotate(90deg);
+        width: 100%;
+    }
+}
+
+/* 새로 추가된 고유명사 관리 모달 스타일 */
+.custom-noun-modal {
+  padding: 20px;
+}
+
+.custom-noun-modal h2 {
+  margin-bottom: 15px;
+}
+
+.custom-noun-modal ul {
+  list-style-type: none;
+  padding: 0;
+  margin-bottom: 20px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.custom-noun-modal li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 5px;
+  background-color: var(--background-secondary);
+  border-radius: var(--radius-s);
+}
+
+.custom-noun-modal input[type="text"] {
+  width: 70%;
+  padding: 5px;
+  margin-right: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+}
+
+.custom-noun-modal button {
+  padding: 5px 10px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+
+.custom-noun-modal button:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.custom-noun-modal .add-noun-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
