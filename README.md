@@ -51,9 +51,3 @@
 ## 기여하기
 
 버그 리포트, 기능 제안 또는 풀 리퀘스트는 언제나 환영합니다. GitHub 저장소에 이슈를 등록해주세요.
-
-## 연락처
-
-개발자: [Your Name]
-이메일: [Your Email]
-GitHub: [Your GitHub Profile]
