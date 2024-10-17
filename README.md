@@ -53,4 +53,4 @@
 
 버그 리포트, 기능 제안 또는 풀 리퀘스트는 언제나 환영합니다. GitHub 저장소에 이슈를 등록해주세요.
 
-Ko-fi.com/dldisud
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/D1D710BIPE)
