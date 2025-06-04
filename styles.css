@@ -230,3 +230,19 @@
   justify-content: space-between;
   align-items: center;
 }
+#correctionPopup .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+    background: var(--background-secondary);
+}
+
+#correctionPopup .pagination button {
+    margin: 0 5px;
+    padding: 5px 10px;
+}
+
+#correctionPopup .pagination-info {
+    margin: 0 10px;
+}
