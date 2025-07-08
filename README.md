@@ -25,7 +25,7 @@
 
 1. **플러그인 다운로드**
     
-    - 이 저장소의 [Releases](https://www.google.com/url?sa=E&q=https%3A%2F%2Fgithub.com%2Fdldisud%2Fobsidian-korean-spellchecker%2Freleases) 페이지에서 최신 버전의 main.js, styles.css, manifest.json 파일을 다운로드합니다.
+    - 이 저장소의 [Releases]페이지에서 최신 버전의 main.js, styles.css, manifest.json 파일을 다운로드합니다.
         
 2. **Obsidian 플러그인 폴더에 새 폴더 생성**
     
@@ -80,11 +80,6 @@
 ### 1. 인터랙티브 수정 창
 
 단순히 오류만 알려주는 것을 넘어, 사용자가 쉽고 편하게 교정할 수 있도록 설계되었습니다.
-
-![alt text](https://user-images.githubusercontent.com/1318823/189733738-f23069c3-149b-419b-a916-c560384813ff.gif)
-
-  
-(스크린샷이나 GIF를 여기에 추가하면 좋습니다.)
 
 - **좌측(원본)**: 현재 페이지에서 검출된 오류 단어들이 하이라이트됩니다.
     
