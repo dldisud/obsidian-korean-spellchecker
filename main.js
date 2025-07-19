@@ -353,77 +353,17 @@ class SpellingPlugin extends obsidian.Plugin {
   excludedNounsMap = new Map();
 
   async onload() {
-    // 6. Sentence case 적용
-    this.addRibbonIcon("han-spellchecker", "Check spelling", async () => {
-      const markdownView = this.app.workspace.getActiveViewOfType(obsidian.MarkdownView);
-      const editor = markdownView?.editor;
-      if (!editor) {
-        new obsidian.Notice("에디터를 찾을 수 없습니다.");
-        return;
-      }
-      const selectedText = editor.getSelection();
-      if (!selectedText) {
-        new obsidian.Notice("선택된 텍스트가 없습니다.");
-        return;
-      }
-      const cursorStart = editor.getCursor("from");
-      const cursorEnd = editor.getCursor("to");
-      editor.setCursor(cursorEnd);
-      
-      const processedText = this.excludeCustomNouns(selectedText);
-      
-      let result; 
-      try {
-        new obsidian.Notice("맞춤법 검사를 시작합니다...", 3000); 
-        result = await checkSpelling(processedText);
-      } catch (error) {
-        new obsidian.Notice(`맞춤법 검사 오류: ${error.message}`, 5000); 
-        console.error(error);
-        return;
-      }
+    const statusBarItemEl = this.addStatusBarItem();
+    statusBarItemEl.setText('맞춤법 검사');
+    statusBarItemEl.addClass('korean-spellchecker-statusbar');
 
-      if (!result || !Array.isArray(result.corrections) || result.corrections.length === 0) {
-        new obsidian.Notice("수정할 것이 없습니다. 훌륭합니다!", 3000);
-      } else {
-        const finalCorrections = this.includeCustomNounsInCorrections(result.corrections); 
-        // 5. 네이티브 모달 사용
-        new CorrectionModal(this.app, finalCorrections, selectedText, cursorStart, cursorEnd, editor).open();
-      }
-    });
+    // 6. Sentence case 적용
+    this.addRibbonIcon("han-spellchecker", "Check spelling", () => this.runSpellCheck());
 
     this.addCommand({
       id: "check-spelling",
       name: "Check spelling", // 6. Sentence case 적용
-      editorCallback: async (editor) => {
-        const selectedText = editor.getSelection();
-        if (!selectedText) {
-          new obsidian.Notice("선택된 텍스트가 없습니다.");
-          return;
-        }
-        const cursorStart = editor.getCursor("from");
-        const cursorEnd = editor.getCursor("to");
-        editor.setCursor(cursorEnd);
-        
-        const processedText = this.excludeCustomNouns(selectedText);
-        
-        let result;
-        try {
-          new obsidian.Notice("맞춤법 검사를 시작합니다...", 3000);
-          result = await checkSpelling(processedText);
-        } catch (error) {
-          new obsidian.Notice(`맞춤법 검사 오류: ${error.message}`, 5000);
-          console.error(error);
-          return;
-        }
-
-        if (!result || !Array.isArray(result.corrections) || result.corrections.length === 0) {
-          new obsidian.Notice("수정할 것이 없습니다. 훌륭합니다!", 3000);
-        } else {
-          const finalCorrections = this.includeCustomNounsInCorrections(result.corrections); 
-          // 5. 네이티브 모달 사용
-          new CorrectionModal(this.app, finalCorrections, selectedText, cursorStart, cursorEnd, editor).open();
-        }
-      }
+      editorCallback: () => this.runSpellCheck()
     });
 
     await this.loadSettings();
@@ -433,6 +373,45 @@ class SpellingPlugin extends obsidian.Plugin {
       name: 'Manage custom nouns', // 6. Sentence case 적용
       callback: () => this.openCustomNounModal()
     });
+
+    this.registerDomEvent(statusBarItemEl, 'click', () => this.runSpellCheck());
+  }
+
+  async runSpellCheck() {
+    const markdownView = this.app.workspace.getActiveViewOfType(obsidian.MarkdownView);
+    const editor = markdownView?.editor;
+    if (!editor) {
+      new obsidian.Notice("에디터를 찾을 수 없습니다.");
+      return;
+    }
+    const selectedText = editor.getSelection();
+    if (!selectedText) {
+      new obsidian.Notice("선택된 텍스트가 없습니다.");
+      return;
+    }
+    const cursorStart = editor.getCursor("from");
+    const cursorEnd = editor.getCursor("to");
+    editor.setCursor(cursorEnd);
+
+    const processedText = this.excludeCustomNouns(selectedText);
+
+    let result;
+    try {
+      new obsidian.Notice("맞춤법 검사를 시작합니다...", 3000);
+      result = await checkSpelling(processedText);
+    } catch (error) {
+      new obsidian.Notice(`맞춤법 검사 오류: ${error.message}`, 5000);
+      console.error(error);
+      return;
+    }
+
+    if (!result || !Array.isArray(result.corrections) || result.corrections.length === 0) {
+      new obsidian.Notice("수정할 것이 없습니다. 훌륭합니다!", 3000);
+    } else {
+      const finalCorrections = this.includeCustomNounsInCorrections(result.corrections);
+      // 5. 네이티브 모달 사용
+      new CorrectionModal(this.app, finalCorrections, selectedText, cursorStart, cursorEnd, editor).open();
+    }
   }
 
   excludeCustomNouns(text) {
