@@ -1,7 +1,7 @@
 {
   "id": "korean-spellchecker",
   "name": "Korean Spellchecker",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "minAppVersion": "0.15.0",
   "description": "Checks Korean spelling and grammar using an online service. Features a custom dictionary to exclude specific nouns (e.g., names, technical terms) from being flagged as errors.",
   "author": "dldisud",
