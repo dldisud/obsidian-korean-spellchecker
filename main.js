@@ -355,6 +355,7 @@ class SpellingPlugin extends obsidian.Plugin {
   async onload() {
     const statusBarItemEl = this.addStatusBarItem();
     statusBarItemEl.setText('맞춤법 검사');
+    statusBarItemEl.addClass('korean-spellchecker-statusbar');
 
     // 6. Sentence case 적용
     this.addRibbonIcon("han-spellchecker", "Check spelling", () => this.runSpellCheck());

@@ -142,3 +142,16 @@
     background-color: var(--background-secondary);
     border-radius: var(--radius-s);
   }
+
+  /* 상태 표시줄 버튼 스타일 */
+  .korean-spellchecker-statusbar {
+    padding: 0 10px;
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-radius: var(--radius-s);
+    cursor: pointer;
+  }
+
+  .korean-spellchecker-statusbar:hover {
+    background-color: var(--interactive-accent-hover);
+  }
