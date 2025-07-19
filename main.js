@@ -350,6 +350,7 @@ class CorrectionModal extends obsidian.Modal {
 
 class SpellingPlugin extends obsidian.Plugin {
   customNouns = new Set();
+  excludedNounsMap = new Map();
 
   async onload() {
     // 6. Sentence case 적용
@@ -435,29 +436,46 @@ class SpellingPlugin extends obsidian.Plugin {
   }
 
   excludeCustomNouns(text) {
+    this.excludedNounsMap.clear();
     let processedText = text;
     const sortedNouns = Array.from(this.customNouns).sort((a, b) => b.length - a.length);
+    let placeholderIndex = 0;
 
     sortedNouns.forEach(noun => {
-      if (noun.trim() === "") return;
-      const escapedNoun = noun.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
-      const regex = new RegExp(escapedNoun, 'g');
-      processedText = processedText.replace(regex, `___${noun}___`);
+        if (noun.trim() === "") return;
+
+        const escapedNoun = noun.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(escapedNoun, 'g');
+
+        processedText = processedText.replace(regex, () => {
+            const placeholder = `__NOUN_${placeholderIndex++}__`;
+            this.excludedNounsMap.set(placeholder, noun);
+            return placeholder;
+        });
     });
     return processedText;
   }
 
   includeCustomNounsInCorrections(corrections) {
     if (!Array.isArray(corrections)) return [];
+
+    const restoreNouns = (text) => {
+        let restoredText = text;
+        for (const [placeholder, noun] of this.excludedNounsMap.entries()) {
+            restoredText = restoredText.replace(new RegExp(placeholder, 'g'), noun);
+        }
+        return restoredText;
+    };
+
     return corrections.map(correction => {
-      if (!correction || typeof correction.original !== 'string' || !Array.isArray(correction.corrected)) {
-        return correction; 
-      }
-      return {
-        ...correction,
-        original: correction.original.replace(/___(.+?)___/g, '$1'),
-        corrected: correction.corrected.map(cand => typeof cand === 'string' ? cand.replace(/___(.+?)___/g, '$1') : cand)
-      };
+        if (!correction || typeof correction.original !== 'string' || !Array.isArray(correction.corrected)) {
+            return correction;
+        }
+        return {
+            ...correction,
+            original: restoreNouns(correction.original),
+            corrected: correction.corrected.map(cand => typeof cand === 'string' ? restoreNouns(cand) : cand)
+        };
     });
   }
 
