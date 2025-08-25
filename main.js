@@ -1,8 +1,17 @@
 const obsidian = require('obsidian');
 
-async function fetchNextActionToken() {
+async function fetchNextActionToken(app) {
   const fallback = "7f2acc76ef56592dba37ceb7bfdff1248517384d32";
   try {
+
+    const res = await app.vault.adapter.requestUrl({
+        url: "https://nara-speller.co.kr/speller",
+        method: "GET",
+        headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "Accept": "text/html,application/xhtml+xml"
+        }
+
     const res = await obsidian.requestUrl({
       url: "https://nara-speller.co.kr/speller",
       method: "GET",
@@ -10,6 +19,7 @@ async function fetchNextActionToken() {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "Accept": "text/html,application/xhtml+xml"
       }
+
     });
     const html = res.text;
     const match = html.match(/"?next[-_]action"?\s*[:=]\s*"([0-9a-f]{32})"/i);
@@ -22,7 +32,7 @@ async function fetchNextActionToken() {
   return fallback;
 }
 
-async function checkSpelling(text) {
+async function checkSpelling(app, text) {
   const maxWords = 300;
   const words = text.split(/\s+/);
   const chunks = [];
@@ -33,10 +43,32 @@ async function checkSpelling(text) {
 
   const aggregatedCorrections = [];
 
-  const actionToken = await fetchNextActionToken();
+  const actionToken = await fetchNextActionToken(app);
 
   for (const chunk of chunks) {
     const targetUrl = "https://nara-speller.co.kr/speller";
+
+
+    const body = `1_speller-text=${encodeURIComponent(chunk.replace(/\n/g, "\r"))}&0=${encodeURIComponent('[{"data":null,"error":null},"$K1"]')}`;
+
+    try {
+      const response = await app.vault.adapter.requestUrl({
+          url: targetUrl,
+          method: "POST",
+          headers: {
+              "Accept": "text/x-component, */*",
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+              "Origin": "https://nara-speller.co.kr",
+              "Referer": "https://nara-speller.co.kr/speller",
+              "Next-Action": actionToken,
+              "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: body
+      });
+      
+      const responseText = response.text;
+
+      // requestUrl throws on non-2xx, so the !response.ok check is implicitly handled by the catch block.
 
     const boundary = `----WebKitFormBoundary${Math.random().toString(16).slice(2)}`;
     const formBody = [
@@ -76,6 +108,7 @@ async function checkSpelling(text) {
         );
         throw new Error(`Network error: ${response.status} ${response.statusText}.`);
       }
+
       
       let jsonForFirstPart = {"a":"$@1"}; 
       let jsonForMainData = {};    
@@ -468,6 +501,47 @@ class SpellingPlugin extends obsidian.Plugin {
       name: 'Manage custom nouns', // 6. Sentence case 적용
       callback: () => this.openCustomNounModal()
     });
+
+
+    this.registerDomEvent(statusBarItemEl, 'click', () => this.runSpellCheck());
+  }
+
+  async runSpellCheck() {
+    const markdownView = this.app.workspace.getActiveViewOfType(obsidian.MarkdownView);
+    const editor = markdownView?.editor;
+    if (!editor) {
+      new obsidian.Notice("에디터를 찾을 수 없습니다.");
+      return;
+    }
+    const selectedText = editor.getSelection();
+    if (!selectedText) {
+      new obsidian.Notice("선택된 텍스트가 없습니다.");
+      return;
+    }
+    const cursorStart = editor.getCursor("from");
+    const cursorEnd = editor.getCursor("to");
+    editor.setCursor(cursorEnd);
+
+    const processedText = this.excludeCustomNouns(selectedText);
+
+    let result;
+    try {
+      new obsidian.Notice("맞춤법 검사를 시작합니다...", 3000);
+      result = await checkSpelling(this.app, processedText);
+    } catch (error) {
+      new obsidian.Notice(`맞춤법 검사 오류: ${error.message}`, 5000);
+      console.error(error);
+      return;
+    }
+
+    if (!result || !Array.isArray(result.corrections) || result.corrections.length === 0) {
+      new obsidian.Notice("수정할 것이 없습니다. 훌륭합니다!", 3000);
+    } else {
+      const finalCorrections = this.includeCustomNounsInCorrections(result.corrections);
+      // 5. 네이티브 모달 사용
+      new CorrectionModal(this.app, finalCorrections, selectedText, cursorStart, cursorEnd, editor).open();
+    }
+
   }
 
   excludeCustomNouns(text) {
