@@ -1,6 +1,12 @@
 const obsidian = require('obsidian');
 
 
+const fetchNextActionToken = async (app) => {
+  const fallback = "7f2acc76ef56592dba37ceb7bfdff1248517384d32";
+  try {
+    const res = await app.vault.adapter.requestUrl({
+
+
 async function fetchNextActionToken(app) {
   const fallback = "7f2acc76ef56592dba37ceb7bfdff1248517384d32";
   try {
@@ -32,6 +38,10 @@ async function fetchNextActionToken(app) {
 
 
     });
+    const html = res.text;
+
+
+    });
     var html = res.text;
 
 
@@ -47,6 +57,7 @@ async function fetchNextActionToken(app) {
     const html = res.text;
 
 
+
     const match = html.match(/"?next[-_]action"?\s*[:=]\s*"([0-9a-f]{32})"/i);
     if (match && match[1]) {
       return match[1];
@@ -55,9 +66,13 @@ async function fetchNextActionToken(app) {
     console.error("Failed to retrieve Next-Action token:", e.message);
   }
   return fallback;
-}
+};
+
+
+const checkSpelling = async (app, text) => {
 
 async function checkSpelling(app, text) {
+
   const maxWords = 300;
   const words = text.split(/\s+/);
   const chunks = [];
@@ -88,6 +103,11 @@ async function checkSpelling(app, text) {
               "Content-Type": "application/x-www-form-urlencoded"
           },
           body: body
+
+      });
+      
+      const responseText = response.text;
+
       });
       
       const responseText = response.text;
@@ -169,6 +189,7 @@ async function checkSpelling(app, text) {
 
 
 
+
       
       let jsonForFirstPart = {"a":"$@1"}; 
       let jsonForMainData = {};    
@@ -209,7 +230,7 @@ async function checkSpelling(app, text) {
   }
 
   return { resultOutput: "", corrections: aggregatedCorrections };
-}
+};
 
 function parseNewSpellingApiResponse(responseJson) {
   if (!responseJson || !Array.isArray(responseJson) || responseJson.length < 2) {
@@ -692,9 +713,13 @@ class SpellingPlugin extends obsidian.Plugin {
       result = await checkSpelling(this.app, processedText);
 
 
+      result = await checkSpelling(this.app, processedText);
+
+
       result = await this._checkSpelling(processedText);
 
       result = await checkSpelling(this.app, processedText);
+
 
 
     } catch (error) {
