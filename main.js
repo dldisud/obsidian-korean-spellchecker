@@ -1,10 +1,11 @@
 const obsidian = require('obsidian');
 
 async function checkSpelling(text) {
+  // Old speller handles max ~300 tokens per page; chunk to be safe
   const maxWords = 300;
   const words = text.split(/\s+/);
   const chunks = [];
-  
+
   for (let i = 0; i < words.length; i += maxWords) {
     chunks.push(words.slice(i, i + maxWords).join(' '));
   }
@@ -12,124 +13,88 @@ async function checkSpelling(text) {
   const aggregatedCorrections = [];
 
   for (const chunk of chunks) {
-    const targetUrl = "https://nara-speller.co.kr/speller";
-
-    // FormData를 직접 사용할 수 없어 multipart/form-data 요청 본문을 수동으로 생성합니다.
-    const boundary = "----WebKitFormBoundary" + Math.random().toString(16).slice(2);
-    const bodyParts = [
-      `--${boundary}`,
-      'Content-Disposition: form-data; name="1_speller-text"',
-      '',
-      chunk.replace(/\n/g, "\r"),
-      `--${boundary}`,
-      'Content-Disposition: form-data; name="0"',
-      '',
-      '[{"data":null,"error":null},"$K1"]',
-      `--${boundary}--`,
-      ''
-    ];
-    const requestBody = bodyParts.join('\r\n');
+    const resultsUrl = "https://nara-speller.co.kr/old_speller/results";
+    const body = new URLSearchParams();
+    // Match site’s form field names
+    body.set('text1', chunk);
+    // Enable stronger rules if available (checkbox in form). Server tolerates absence.
+    body.set('btnModeChange', 'on');
 
     try {
-      // fetch 대신 obsidian.requestUrl을 사용하여 CORS 문제를 우회합니다.
-      const response = await obsidian.requestUrl({
-        url: targetUrl,
-        method: "POST",
-        headers: { 
-          "Accept": "text/x-component, */*",
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-          // Content-Type에 boundary를 명시해야 합니다.
-          "Content-Type": `multipart/form-data; boundary=${boundary}`
-          // CORS 오류를 유발하던 Origin, Referer, Next-Action 헤더는 제거합니다.
+      // Use Obsidian's requestUrl to bypass CORS
+      const res = await obsidian.requestUrl({
+        url: resultsUrl,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          'Origin': 'https://nara-speller.co.kr',
+          'Referer': 'https://nara-speller.co.kr/old_speller/'
         },
-        body: requestBody
+        body: body.toString()
       });
-      
-      const responseText = response.text;
 
-      if (response.status < 200 || response.status >= 300) {
+      const html = res.text || '';
+
+      if (res.status < 200 || res.status >= 300 || !html) {
         console.error(
-            `Network response was not ok. Status: ${response.status}`,
-            "Response Text:", responseText.substring(0, 500)
+          `Network response was not ok. Status: ${res.status}`,
+          'Response snippet:', (html || '').substring(0, 500)
         );
-        throw new Error(`Network error: Status code ${response.status}.`);
-      }
-      
-      let jsonForFirstPart = {"a":"$@1"}; 
-      let jsonForMainData = {};    
-      let referencedTextForMainData = null; 
-
-      const lines = responseText.split('\n');
-      
-      lines.forEach(line => {
-          if (line.startsWith("0:")) {
-              try {
-                  jsonForFirstPart = JSON.parse(line.substring(2));
-              } catch (e) { /* 파싱 실패 시 무시 */ }
-          } else if (line.startsWith("1:")) {
-              try {
-                  jsonForMainData = JSON.parse(line.substring(2));
-              } catch (e) { /* 파싱 실패 시 무시 */ }
-          } else if (line.startsWith("2:T")) { 
-              const textStartIndex = line.indexOf(',') + 1;
-              if (textStartIndex > 2 && textStartIndex < line.length) {
-                referencedTextForMainData = line.substring(textStartIndex);
-              } else {
-                referencedTextForMainData = line.substring(2); 
-              }
-          }
-      });
-      
-      const responseJsonArray = [jsonForFirstPart, jsonForMainData];
-      const parsedResult = parseNewSpellingApiResponse(responseJsonArray);       
-
-      if (parsedResult && parsedResult.corrections) {
-        aggregatedCorrections.push(...parsedResult.corrections);
+        throw new Error(`Network error: ${res.status}.`);
       }
 
+      const parsed = parseOldSpellerResults(html);
+      if (parsed && parsed.corrections) {
+        aggregatedCorrections.push(...parsed.corrections);
+      }
     } catch (error) {
-      console.error("Error during spell check for chunk:", error.message); 
-      throw new Error(`Failed to check spelling for chunk "${chunk.substring(0,20)}...": ${error.message}`);
+      console.error('Error during spell check for chunk:', error?.message || error);
+      throw new Error(`Failed to check spelling for chunk "${chunk.substring(0, 20)}...": ${error.message}`);
     }
   }
 
-  return { resultOutput: "", corrections: aggregatedCorrections };
+  return { resultOutput: '', corrections: aggregatedCorrections };
 }
 
-function parseNewSpellingApiResponse(responseJson) {
-  if (!responseJson || !Array.isArray(responseJson) || responseJson.length < 2) {
-    return { resultOutput: "", corrections: [] }; 
+function parseOldSpellerResults(html) {
+  if (typeof html !== 'string' || html.trim() === '') {
+    return { resultOutput: '', corrections: [] };
   }
 
-  const spellDataContainer = responseJson[1]; 
-  if (!spellDataContainer || typeof spellDataContainer !== 'object' || spellDataContainer === null || Object.keys(spellDataContainer).length === 0) {
-    return { resultOutput: "", corrections: [] };
-  }
-  
-  if (spellDataContainer.hasOwnProperty('digest')) {
-      return { resultOutput: `서버 오류: ${spellDataContainer.digest}`, corrections: []};
+  // Extract the embedded `data = [...] ;` JSON from results page
+  const match = html.match(/(?:var\s+)?data\s*=\s*(\[[\s\S]*?\]);/);
+  if (!match) {
+    return { resultOutput: '', corrections: [] };
   }
 
-  const spellData = spellDataContainer.data;
+  let arr;
+  try {
+    arr = JSON.parse(match[1]);
+  } catch (e) {
+    console.error('Failed to parse embedded results JSON:', e);
+    return { resultOutput: '', corrections: [] };
+  }
 
-  if (!spellData || !spellData.errInfo || !spellData.errInfo.length === 0) {
-    return { resultOutput: "", corrections: [] };
+  if (!Array.isArray(arr)) {
+    return { resultOutput: '', corrections: [] };
   }
 
   const corrections = [];
-  spellData.errInfo.forEach((err) => {
-    if (!err || typeof err !== 'object') return; 
-    
-    const correctedWords = err.candWord ? err.candWord.split("|") : (err.orgStr ? [err.orgStr] : []);
+  for (const entry of arr) {
+    const errList = entry && Array.isArray(entry.errInfo) ? entry.errInfo : [];
+    for (const err of errList) {
+      if (!err || typeof err !== 'object') continue;
+      const cand = typeof err.candWord === 'string' ? err.candWord : '';
+      const candidates = cand.split('|').map(s => s.trim()).filter(Boolean);
+      corrections.push({
+        original: err.orgStr || '',
+        corrected: candidates.length > 0 ? candidates : (err.orgStr ? [err.orgStr] : []),
+        help: decodeHtmlEntities(err.help || '')
+      });
+    }
+  }
 
-    corrections.push({
-      original: err.orgStr || "", 
-      corrected: correctedWords,
-      help: decodeHtmlEntities(err.help || "") 
-    });
-  });
-
-  return { resultOutput: "", corrections }; 
+  return { resultOutput: '', corrections };
 }
 
 function decodeHtmlEntities(text) {
