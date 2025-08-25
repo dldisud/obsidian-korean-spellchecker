@@ -4,6 +4,12 @@ const obsidian = require('obsidian');
 async function fetchNextActionToken(app) {
   const fallback = "7f2acc76ef56592dba37ceb7bfdff1248517384d32";
   try {
+    const res = await app.vault.adapter.requestUrl({
+
+
+async function fetchNextActionToken(app) {
+  const fallback = "7f2acc76ef56592dba37ceb7bfdff1248517384d32";
+  try {
     var res = await app.vault.adapter.requestUrl({
 
 
@@ -13,12 +19,17 @@ async function fetchNextActionToken(app) {
 
     const res = await app.vault.adapter.requestUrl({
 
+
         url: "https://nara-speller.co.kr/speller",
         method: "GET",
         headers: {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
             "Accept": "text/html,application/xhtml+xml"
         }
+
+    });
+    const html = res.text;
+
 
     });
     var html = res.text;
@@ -34,6 +45,7 @@ async function fetchNextActionToken(app) {
 
     });
     const html = res.text;
+
 
     const match = html.match(/"?next[-_]action"?\s*[:=]\s*"([0-9a-f]{32})"/i);
     if (match && match[1]) {
@@ -60,6 +72,25 @@ async function checkSpelling(app, text) {
 
   for (const chunk of chunks) {
     const targetUrl = "https://nara-speller.co.kr/speller";
+
+    const body = `1_speller-text=${encodeURIComponent(chunk.replace(/\n/g, "\r"))}&0=${encodeURIComponent('[{"data":null,"error":null},"$K1"]')}`;
+
+    try {
+      const response = await app.vault.adapter.requestUrl({
+          url: targetUrl,
+          method: "POST",
+          headers: {
+              "Accept": "text/x-component, */*",
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+              "Origin": "https://nara-speller.co.kr",
+              "Referer": "https://nara-speller.co.kr/speller",
+              "Next-Action": actionToken,
+              "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: body
+      });
+      
+      const responseText = response.text;
 
 
     var body = `1_speller-text=${encodeURIComponent(chunk.replace(/\n/g, "\r"))}&0=${encodeURIComponent('[{"data":null,"error":null},"$K1"]')}`;
@@ -135,6 +166,7 @@ async function checkSpelling(app, text) {
         );
         throw new Error(`Network error: ${response.status} ${response.statusText}.`);
       }
+
 
 
       
@@ -657,9 +689,13 @@ class SpellingPlugin extends obsidian.Plugin {
       result = await checkSpelling(this.app, processedText);
 
 
+      result = await checkSpelling(this.app, processedText);
+
+
       result = await this._checkSpelling(processedText);
 
       result = await checkSpelling(this.app, processedText);
+
 
     } catch (error) {
       new obsidian.Notice(`맞춤법 검사 오류: ${error.message}`, 5000);
