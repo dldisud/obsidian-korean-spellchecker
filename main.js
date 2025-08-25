@@ -3,6 +3,7 @@ const obsidian = require('obsidian');
 async function fetchNextActionToken(app) {
   const fallback = "7f2acc76ef56592dba37ceb7bfdff1248517384d32";
   try {
+
     const res = await app.vault.adapter.requestUrl({
         url: "https://nara-speller.co.kr/speller",
         method: "GET",
@@ -10,6 +11,15 @@ async function fetchNextActionToken(app) {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
             "Accept": "text/html,application/xhtml+xml"
         }
+
+    const res = await obsidian.requestUrl({
+      url: "https://nara-speller.co.kr/speller",
+      method: "GET",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "text/html,application/xhtml+xml"
+      }
+
     });
     const html = res.text;
     const match = html.match(/"?next[-_]action"?\s*[:=]\s*"([0-9a-f]{32})"/i);
@@ -38,6 +48,7 @@ async function checkSpelling(app, text) {
   for (const chunk of chunks) {
     const targetUrl = "https://nara-speller.co.kr/speller";
 
+
     const body = `1_speller-text=${encodeURIComponent(chunk.replace(/\n/g, "\r"))}&0=${encodeURIComponent('[{"data":null,"error":null},"$K1"]')}`;
 
     try {
@@ -58,6 +69,46 @@ async function checkSpelling(app, text) {
       const responseText = response.text;
 
       // requestUrl throws on non-2xx, so the !response.ok check is implicitly handled by the catch block.
+
+    const boundary = `----WebKitFormBoundary${Math.random().toString(16).slice(2)}`;
+    const formBody = [
+      `--${boundary}`,
+      `Content-Disposition: form-data; name="1_speller-text"`,
+      "",
+      chunk.replace(/\n/g, "\r"),
+      `--${boundary}`,
+      `Content-Disposition: form-data; name="0"`,
+      "",
+      '[{"data":null,"error":null},"$K1"]',
+      `--${boundary}--`,
+      ""
+    ].join("\r\n");
+
+    try {
+      const response = await obsidian.requestUrl({
+        url: targetUrl,
+        method: "POST",
+        headers: {
+          "Accept": "text/x-component, */*",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+          "Origin": "https://nara-speller.co.kr",
+          "Referer": "https://nara-speller.co.kr/speller",
+          "Next-Action": actionToken,
+          "Content-Type": `multipart/form-data; boundary=${boundary}`
+        },
+        body: formBody
+      });
+
+      const responseText = response.text;
+
+      if (response.status !== 200) {
+        console.error(
+            `Network response was not ok. Status: ${response.status} (${response.statusText})`,
+            "Response Text:", responseText.substring(0, 500)
+        );
+        throw new Error(`Network error: ${response.status} ${response.statusText}.`);
+      }
+
       
       let jsonForFirstPart = {"a":"$@1"}; 
       let jsonForMainData = {};    
@@ -368,20 +419,79 @@ class CorrectionModal extends obsidian.Modal {
 
 class SpellingPlugin extends obsidian.Plugin {
   customNouns = new Set();
-  excludedNounsMap = new Map();
 
   async onload() {
-    const statusBarItemEl = this.addStatusBarItem();
-    statusBarItemEl.setText('맞춤법 검사');
-    statusBarItemEl.addClass('korean-spellchecker-statusbar');
-
     // 6. Sentence case 적용
-    this.addRibbonIcon("han-spellchecker", "Check spelling", () => this.runSpellCheck());
+    this.addRibbonIcon("han-spellchecker", "Check spelling", async () => {
+      const markdownView = this.app.workspace.getActiveViewOfType(obsidian.MarkdownView);
+      const editor = markdownView?.editor;
+      if (!editor) {
+        new obsidian.Notice("에디터를 찾을 수 없습니다.");
+        return;
+      }
+      const selectedText = editor.getSelection();
+      if (!selectedText) {
+        new obsidian.Notice("선택된 텍스트가 없습니다.");
+        return;
+      }
+      const cursorStart = editor.getCursor("from");
+      const cursorEnd = editor.getCursor("to");
+      editor.setCursor(cursorEnd);
+      
+      const processedText = this.excludeCustomNouns(selectedText);
+      
+      let result; 
+      try {
+        new obsidian.Notice("맞춤법 검사를 시작합니다...", 3000); 
+        result = await checkSpelling(processedText);
+      } catch (error) {
+        new obsidian.Notice(`맞춤법 검사 오류: ${error.message}`, 5000); 
+        console.error(error);
+        return;
+      }
+
+      if (!result || !Array.isArray(result.corrections) || result.corrections.length === 0) {
+        new obsidian.Notice("수정할 것이 없습니다. 훌륭합니다!", 3000);
+      } else {
+        const finalCorrections = this.includeCustomNounsInCorrections(result.corrections); 
+        // 5. 네이티브 모달 사용
+        new CorrectionModal(this.app, finalCorrections, selectedText, cursorStart, cursorEnd, editor).open();
+      }
+    });
 
     this.addCommand({
       id: "check-spelling",
       name: "Check spelling", // 6. Sentence case 적용
-      editorCallback: () => this.runSpellCheck()
+      editorCallback: async (editor) => {
+        const selectedText = editor.getSelection();
+        if (!selectedText) {
+          new obsidian.Notice("선택된 텍스트가 없습니다.");
+          return;
+        }
+        const cursorStart = editor.getCursor("from");
+        const cursorEnd = editor.getCursor("to");
+        editor.setCursor(cursorEnd);
+        
+        const processedText = this.excludeCustomNouns(selectedText);
+        
+        let result;
+        try {
+          new obsidian.Notice("맞춤법 검사를 시작합니다...", 3000);
+          result = await checkSpelling(processedText);
+        } catch (error) {
+          new obsidian.Notice(`맞춤법 검사 오류: ${error.message}`, 5000);
+          console.error(error);
+          return;
+        }
+
+        if (!result || !Array.isArray(result.corrections) || result.corrections.length === 0) {
+          new obsidian.Notice("수정할 것이 없습니다. 훌륭합니다!", 3000);
+        } else {
+          const finalCorrections = this.includeCustomNounsInCorrections(result.corrections); 
+          // 5. 네이티브 모달 사용
+          new CorrectionModal(this.app, finalCorrections, selectedText, cursorStart, cursorEnd, editor).open();
+        }
+      }
     });
 
     await this.loadSettings();
@@ -391,6 +501,7 @@ class SpellingPlugin extends obsidian.Plugin {
       name: 'Manage custom nouns', // 6. Sentence case 적용
       callback: () => this.openCustomNounModal()
     });
+
 
     this.registerDomEvent(statusBarItemEl, 'click', () => this.runSpellCheck());
   }
@@ -430,49 +541,33 @@ class SpellingPlugin extends obsidian.Plugin {
       // 5. 네이티브 모달 사용
       new CorrectionModal(this.app, finalCorrections, selectedText, cursorStart, cursorEnd, editor).open();
     }
+
   }
 
   excludeCustomNouns(text) {
-    this.excludedNounsMap.clear();
     let processedText = text;
     const sortedNouns = Array.from(this.customNouns).sort((a, b) => b.length - a.length);
-    let placeholderIndex = 0;
 
     sortedNouns.forEach(noun => {
-        if (noun.trim() === "") return;
-
-        const escapedNoun = noun.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(escapedNoun, 'g');
-
-        processedText = processedText.replace(regex, () => {
-            const placeholder = `__NOUN_${placeholderIndex++}__`;
-            this.excludedNounsMap.set(placeholder, noun);
-            return placeholder;
-        });
+      if (noun.trim() === "") return;
+      const escapedNoun = noun.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
+      const regex = new RegExp(escapedNoun, 'g');
+      processedText = processedText.replace(regex, `___${noun}___`);
     });
     return processedText;
   }
 
   includeCustomNounsInCorrections(corrections) {
     if (!Array.isArray(corrections)) return [];
-
-    const restoreNouns = (text) => {
-        let restoredText = text;
-        for (const [placeholder, noun] of this.excludedNounsMap.entries()) {
-            restoredText = restoredText.replace(new RegExp(placeholder, 'g'), noun);
-        }
-        return restoredText;
-    };
-
     return corrections.map(correction => {
-        if (!correction || typeof correction.original !== 'string' || !Array.isArray(correction.corrected)) {
-            return correction;
-        }
-        return {
-            ...correction,
-            original: restoreNouns(correction.original),
-            corrected: correction.corrected.map(cand => typeof cand === 'string' ? restoreNouns(cand) : cand)
-        };
+      if (!correction || typeof correction.original !== 'string' || !Array.isArray(correction.corrected)) {
+        return correction; 
+      }
+      return {
+        ...correction,
+        original: correction.original.replace(/___(.+?)___/g, '$1'),
+        corrected: correction.corrected.map(cand => typeof cand === 'string' ? cand.replace(/___(.+?)___/g, '$1') : cand)
+      };
     });
   }
 
