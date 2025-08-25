@@ -1,6 +1,9 @@
 const obsidian = require('obsidian');
 
 
+const checkSpelling = async (app, text) => {
+
+
 const fetchNextActionToken = async (app) => {
   const fallback = "7f2acc76ef56592dba37ceb7bfdff1248517384d32";
   try {
@@ -73,6 +76,7 @@ const checkSpelling = async (app, text) => {
 
 async function checkSpelling(app, text) {
 
+
   const maxWords = 300;
   const words = text.split(/\s+/);
   const chunks = [];
@@ -83,12 +87,58 @@ async function checkSpelling(app, text) {
 
   const aggregatedCorrections = [];
 
+
+  // Inlined logic from fetchNextActionToken
+  let actionToken;
+  const fallback = "7f2acc76ef56592dba37ceb7bfdff1248517384d32";
+  try {
+    const res = await app.vault.adapter.requestUrl({
+        url: "https://nara-speller.co.kr/speller",
+        method: "GET",
+        headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "Accept": "text/html,application/xhtml+xml"
+        }
+    });
+    const html = res.text;
+    const match = html.match(/"?next[-_]action"?\s*[:=]\s*"([0-9a-f]{32})"/i);
+    if (match && match[1]) {
+      actionToken = match[1];
+    }
+  } catch (e) {
+    console.error("Failed to retrieve Next-Action token:", e.message);
+  }
+  if (!actionToken) {
+    actionToken = fallback;
+  }
+  // End of inlined logic
+
   const actionToken = await fetchNextActionToken(app);
+
 
   for (const chunk of chunks) {
     const targetUrl = "https://nara-speller.co.kr/speller";
 
     const body = `1_speller-text=${encodeURIComponent(chunk.replace(/\n/g, "\r"))}&0=${encodeURIComponent('[{"data":null,"error":null},"$K1"]')}`;
+
+
+    try {
+      const response = await app.vault.adapter.requestUrl({
+          url: targetUrl,
+          method: "POST",
+          headers: {
+              "Accept": "text/x-component, */*",
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+              "Origin": "https://nara-speller.co.kr",
+              "Referer": "https://nara-speller.co.kr/speller",
+              "Next-Action": actionToken,
+              "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: body
+      });
+      
+      const responseText = response.text;
+
 
     try {
       const response = await app.vault.adapter.requestUrl({
@@ -716,9 +766,13 @@ class SpellingPlugin extends obsidian.Plugin {
       result = await checkSpelling(this.app, processedText);
 
 
+      result = await checkSpelling(this.app, processedText);
+
+
       result = await this._checkSpelling(processedText);
 
       result = await checkSpelling(this.app, processedText);
+
 
 
 
