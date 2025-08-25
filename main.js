@@ -1,5 +1,25 @@
 const obsidian = require('obsidian');
 
+async function fetchNextActionToken() {
+  const fallback = "7f2acc76ef56592dba37ceb7bfdff1248517384d32";
+  try {
+    const res = await fetch("https://nara-speller.co.kr/speller", {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "text/html,application/xhtml+xml"
+      }
+    });
+    const html = await res.text();
+    const match = html.match(/"?next[-_]action"?\s*[:=]\s*"([0-9a-f]{32})"/i);
+    if (match && match[1]) {
+      return match[1];
+    }
+  } catch (e) {
+    console.error("Failed to retrieve Next-Action token:", e.message);
+  }
+  return fallback;
+}
+
 async function checkSpelling(text) {
   const maxWords = 300;
   const words = text.split(/\s+/);
@@ -11,22 +31,24 @@ async function checkSpelling(text) {
 
   const aggregatedCorrections = [];
 
+  const actionToken = await fetchNextActionToken();
+
   for (const chunk of chunks) {
     const targetUrl = "https://nara-speller.co.kr/speller";
 
     const formData = new FormData();
     formData.append('1_speller-text', chunk.replace(/\n/g, "\r"));
-    formData.append('0', '[{"data":null,"error":null},"$K1"]'); 
+    formData.append('0', '[{"data":null,"error":null},"$K1"]');
 
     try {
       const response = await fetch(targetUrl, {
         method: "POST",
-        headers: { 
+        headers: {
           "Accept": "text/x-component, */*",
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
           "Origin": "https://nara-speller.co.kr",
           "Referer": "https://nara-speller.co.kr/speller",
-          "Next-Action": "7f2acc76ef56592dba37ceb7bfdff1248517384d32"
+          "Next-Action": actionToken
         },
         body: formData
       });
@@ -98,7 +120,7 @@ function parseNewSpellingApiResponse(responseJson) {
 
   const spellData = spellDataContainer.data;
 
-  if (!spellData || !spellData.errInfo || !spellData.errInfo.length === 0) {
+  if (!spellData || !spellData.errInfo || spellData.errInfo.length === 0) {
     return { resultOutput: "", corrections: [] };
   }
 

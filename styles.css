@@ -1,35 +1,124 @@
 /* 맞춤법 검사기 메인 모달 */
 .korean-spellchecker-modal {
-    display: flex;
-    flex-direction: column;
-    padding: 0;
-    height: 85vh;
-  }
-  
-  /* 상단 원본/결과 미리보기 영역 */
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  height: 85vh;
+}
+
+/* 상단 원본/결과 미리보기 영역 */
+.korean-spellchecker-modal .preview-container {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr; /* [결과] [화살표] [미리보기] 3단 구성 */
+  gap: 12px;
+  align-items: stretch;
+  padding: 15px;
+  background: var(--background-secondary-alt);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.korean-spellchecker-modal .error-text,
+.korean-spellchecker-modal .result-preview {
+  padding: 12px;
+  border-radius: var(--radius-m);
+  white-space: pre-wrap;
+  overflow-y: auto;
+  max-height: 25vh; /* 미리보기 영역 최대 높이 */
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  line-height: 1.6;
+}
+
+.korean-spellchecker-modal .arrow {
+  font-size: 1.5em;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 오류 단어 하이라이트 스타일 */
+.spell-correction-highlight {
+  color: var(--color-red);
+  background-color: var(--background-modifier-error);
+  font-weight: bold;
+  padding: 0.1em 0.2em;
+  border-radius: var(--radius-s);
+}
+
+/* 수정 제안 리스트 영역 */
+.korean-spellchecker-modal .content {
+  padding: 15px;
+  line-height: 1.6;
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+.korean-spellchecker-modal .correction-item {
+  margin-bottom: 18px;
+  padding: 12px;
+  background: var(--background-secondary);
+  border-radius: var(--radius-m);
+}
+
+.korean-spellchecker-modal .correction-item span {
+  color: var(--text-accent);
+  font-weight: bold;
+}
+
+.korean-spellchecker-modal .correction-item pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  background-color: var(--background-primary);
+  padding: 10px;
+  border-radius: var(--radius-s);
+  margin-top: 8px;
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+
+.korean-spellchecker-modal .correction-item label {
+  margin: 0 10px 0 2px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.korean-spellchecker-modal .correction-item input[type="radio"] {
+  margin-right: 2px;
+  vertical-align: middle;
+}
+
+.korean-spellchecker-modal .correction-options {
+  margin-top: 5px;
+}
+
+.korean-spellchecker-modal .correction-options input[type="text"] {
+  width: 50%;
+  margin-left: 5px;
+}
+
+/* 하단 버튼 영역 */
+.korean-spellchecker-modal .korean-spellchecker-controls {
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 15px;
+  margin-top: 10px;
+}
+.korean-spellchecker-modal .korean-spellchecker-controls .setting-item-control {
+  justify-content: flex-end; /* 버튼들을 오른쪽으로 정렬 */
+}
+.korean-spellchecker-modal .korean-spellchecker-controls .setting-item-name {
+  flex-grow: 0;
+  margin-right: auto; /* 페이지 정보는 왼쪽으로 */
+}
+
+/* 모바일 화면 대응 */
+@media (max-width: 767px) {
   .korean-spellchecker-modal .preview-container {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr; /* [결과] [화살표] [미리보기] 3단 구성 */
-    gap: 12px;
-    align-items: stretch;
-    padding: 15px;
-    background: var(--background-secondary-alt);
-    border-bottom: 1px solid var(--background-modifier-border);
+    grid-template-columns: 1fr; /* 세로 1단으로 변경 */
+    grid-template-rows: auto auto auto;
   }
-  
-  .korean-spellchecker-modal .error-text,
-  .korean-spellchecker-modal .result-preview {
-    padding: 12px;
-    border-radius: var(--radius-m);
-    white-space: pre-wrap;
-    overflow-y: auto;
-    max-height: 25vh; /* 미리보기 영역 최대 높이 */
-    background-color: var(--background-primary);
-    border: 1px solid var(--background-modifier-border);
-    line-height: 1.6;
-  }
-  
   .korean-spellchecker-modal .arrow {
+bugfix/proper-noun-exclusion
     font-size: 1.5em;
     color: var(--text-muted);
     display: flex;
@@ -155,3 +244,42 @@
   .korean-spellchecker-statusbar:hover {
     background-color: var(--interactive-accent-hover);
   }
+
+    transform: rotate(90deg);
+    padding: 8px 0;
+  }
+}
+
+/* 고유명사 관리 모달 */
+.custom-noun-modal .custom-noun-list-container {
+  max-height: 250px;
+  overflow-y: auto;
+  margin-bottom: 15px;
+}
+.custom-noun-modal ul {
+  list-style-type: none;
+  padding: 0;
+}
+.custom-noun-modal li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 8px;
+  background-color: var(--background-secondary);
+  border-radius: var(--radius-s);
+}
+
+/* 상태 표시줄 버튼 스타일 */
+.korean-spellchecker-statusbar {
+  padding: 0 10px;
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+
+.korean-spellchecker-statusbar:hover {
+  background-color: var(--interactive-accent-hover);
+}
+
