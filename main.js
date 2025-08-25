@@ -1,108 +1,5 @@
 const obsidian = require('obsidian');
 
-async function fetchNextActionToken() {
-  const fallback = "7f2acc76ef56592dba37ceb7bfdff1248517384d32";
-  try {
-    const res = await fetch("https://nara-speller.co.kr/speller", {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Accept": "text/html,application/xhtml+xml"
-      }
-    });
-    const html = await res.text();
-    const match = html.match(/"?next[-_]action"?\s*[:=]\s*"([0-9a-f]{32})"/i);
-    if (match && match[1]) {
-      return match[1];
-    }
-  } catch (e) {
-    console.error("Failed to retrieve Next-Action token:", e.message);
-  }
-  return fallback;
-}
-
-async function checkSpelling(text) {
-  const maxWords = 300;
-  const words = text.split(/\s+/);
-  const chunks = [];
-  
-  for (let i = 0; i < words.length; i += maxWords) {
-    chunks.push(words.slice(i, i + maxWords).join(' '));
-  }
-
-  const aggregatedCorrections = [];
-
-  const actionToken = await fetchNextActionToken();
-
-  for (const chunk of chunks) {
-    const targetUrl = "https://nara-speller.co.kr/speller";
-
-    const formData = new FormData();
-    formData.append('1_speller-text', chunk.replace(/\n/g, "\r"));
-    formData.append('0', '[{"data":null,"error":null},"$K1"]');
-
-    try {
-      const response = await fetch(targetUrl, {
-        method: "POST",
-        headers: {
-          "Accept": "text/x-component, */*",
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-          "Origin": "https://nara-speller.co.kr",
-          "Referer": "https://nara-speller.co.kr/speller",
-          "Next-Action": actionToken
-        },
-        body: formData
-      });
-      
-      const responseText = await response.text();
-
-      if (!response.ok) {
-        console.error(
-            `Network response was not ok. Status: ${response.status} (${response.statusText})`,
-            "Response Text:", responseText.substring(0, 500)
-        );
-        throw new Error(`Network error: ${response.status} ${response.statusText}.`);
-      }
-      
-      let jsonForFirstPart = {"a":"$@1"}; 
-      let jsonForMainData = {};    
-      let referencedTextForMainData = null; 
-
-      const lines = responseText.split('\n');
-      
-      lines.forEach(line => {
-          if (line.startsWith("0:")) {
-              try {
-                  jsonForFirstPart = JSON.parse(line.substring(2));
-              } catch (e) { /* 파싱 실패 시 무시 */ }
-          } else if (line.startsWith("1:")) {
-              try {
-                  jsonForMainData = JSON.parse(line.substring(2));
-              } catch (e) { /* 파싱 실패 시 무시 */ }
-          } else if (line.startsWith("2:T")) { 
-              const textStartIndex = line.indexOf(',') + 1;
-              if (textStartIndex > 2 && textStartIndex < line.length) {
-                referencedTextForMainData = line.substring(textStartIndex);
-              } else {
-                referencedTextForMainData = line.substring(2); 
-              }
-          }
-      });
-      
-      const responseJsonArray = [jsonForFirstPart, jsonForMainData];
-      const parsedResult = parseNewSpellingApiResponse(responseJsonArray);       
-
-      if (parsedResult && parsedResult.corrections) {
-        aggregatedCorrections.push(...parsedResult.corrections);
-      }
-
-    } catch (error) {
-      console.error("Error during spell check for chunk:", error.message); 
-      throw new Error(`Failed to check spelling for chunk "${chunk.substring(0,20)}...": ${error.message}`);
-    }
-  }
-
-  return { resultOutput: "", corrections: aggregatedCorrections };
-}
 
 function parseNewSpellingApiResponse(responseJson) {
   if (!responseJson || !Array.isArray(responseJson) || responseJson.length < 2) {
@@ -399,6 +296,104 @@ class SpellingPlugin extends obsidian.Plugin {
     this.registerDomEvent(statusBarItemEl, 'click', () => this.runSpellCheck());
   }
 
+  async _fetchNextActionToken() {
+    const fallback = "7f2acc76ef56592dba37ceb7bfdff1248517384d32";
+    try {
+      const res = await this.app.vault.adapter.requestUrl({
+          url: "https://nara-speller.co.kr/speller",
+          method: "GET",
+          headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+              "Accept": "text/html,application/xhtml+xml"
+          }
+      });
+      const html = res.text;
+      const match = html.match(/"?next[-_]action"?\s*[:=]\s*"([0-9a-f]{32})"/i);
+      if (match && match[1]) {
+        return match[1];
+      }
+    } catch (e) {
+      console.error("Failed to retrieve Next-Action token:", e.message);
+    }
+    return fallback;
+  }
+
+  async _checkSpelling(text) {
+    const maxWords = 300;
+    const words = text.split(/\s+/);
+    const chunks = [];
+
+    for (let i = 0; i < words.length; i += maxWords) {
+      chunks.push(words.slice(i, i + maxWords).join(' '));
+    }
+
+    const aggregatedCorrections = [];
+
+    const actionToken = await this._fetchNextActionToken();
+
+    for (const chunk of chunks) {
+      const targetUrl = "https://nara-speller.co.kr/speller";
+
+      const body = `1_speller-text=${encodeURIComponent(chunk.replace(/\n/g, "\r"))}&0=${encodeURIComponent('[{"data":null,"error":null},"$K1"]')}`;
+
+      try {
+        const response = await this.app.vault.adapter.requestUrl({
+            url: targetUrl,
+            method: "POST",
+            headers: {
+                "Accept": "text/x-component, */*",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                "Origin": "https://nara-speller.co.kr",
+                "Referer": "https://nara-speller.co.kr/speller",
+                "Next-Action": actionToken,
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: body
+        });
+
+        const responseText = response.text;
+
+        let jsonForFirstPart = {"a":"$@1"};
+        let jsonForMainData = {};
+        let referencedTextForMainData = null;
+
+        const lines = responseText.split('\n');
+
+        lines.forEach(line => {
+            if (line.startsWith("0:")) {
+                try {
+                    jsonForFirstPart = JSON.parse(line.substring(2));
+                } catch (e) { /* 파싱 실패 시 무시 */ }
+            } else if (line.startsWith("1:")) {
+                try {
+                    jsonForMainData = JSON.parse(line.substring(2));
+                } catch (e) { /* 파싱 실패 시 무시 */ }
+            } else if (line.startsWith("2:T")) {
+                const textStartIndex = line.indexOf(',') + 1;
+                if (textStartIndex > 2 && textStartIndex < line.length) {
+                  referencedTextForMainData = line.substring(textStartIndex);
+                } else {
+                  referencedTextForMainData = line.substring(2);
+                }
+            }
+        });
+
+        const responseJsonArray = [jsonForFirstPart, jsonForMainData];
+        const parsedResult = parseNewSpellingApiResponse(responseJsonArray);
+
+        if (parsedResult && parsedResult.corrections) {
+          aggregatedCorrections.push(...parsedResult.corrections);
+        }
+
+      } catch (error) {
+        console.error("Error during spell check for chunk:", error.message);
+        throw new Error(`Failed to check spelling for chunk "${chunk.substring(0,20)}...": ${error.message}`);
+      }
+    }
+
+    return { resultOutput: "", corrections: aggregatedCorrections };
+  }
+
   async runSpellCheck() {
     const markdownView = this.app.workspace.getActiveViewOfType(obsidian.MarkdownView);
     const editor = markdownView?.editor;
@@ -420,7 +415,7 @@ class SpellingPlugin extends obsidian.Plugin {
     let result;
     try {
       new obsidian.Notice("맞춤법 검사를 시작합니다...", 3000);
-      result = await checkSpelling(processedText);
+      result = await this._checkSpelling(processedText);
     } catch (error) {
       new obsidian.Notice(`맞춤법 검사 오류: ${error.message}`, 5000);
       console.error(error);
@@ -431,7 +426,6 @@ class SpellingPlugin extends obsidian.Plugin {
       new obsidian.Notice("수정할 것이 없습니다. 훌륭합니다!", 3000);
     } else {
       const finalCorrections = this.includeCustomNounsInCorrections(result.corrections);
-      // 5. 네이티브 모달 사용
       new CorrectionModal(this.app, finalCorrections, selectedText, cursorStart, cursorEnd, editor).open();
     }
   }
