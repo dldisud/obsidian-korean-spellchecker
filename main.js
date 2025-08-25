@@ -14,31 +14,45 @@ async function checkSpelling(text) {
   for (const chunk of chunks) {
     const targetUrl = "https://nara-speller.co.kr/speller";
 
-    const formData = new FormData();
-    formData.append('1_speller-text', chunk.replace(/\n/g, "\r"));
-    formData.append('0', '[{"data":null,"error":null},"$K1"]'); 
+    // FormData를 직접 사용할 수 없어 multipart/form-data 요청 본문을 수동으로 생성합니다.
+    const boundary = "----WebKitFormBoundary" + Math.random().toString(16).slice(2);
+    const bodyParts = [
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="1_speller-text"',
+      '',
+      chunk.replace(/\n/g, "\r"),
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="0"',
+      '',
+      '[{"data":null,"error":null},"$K1"]',
+      `--${boundary}--`,
+      ''
+    ];
+    const requestBody = bodyParts.join('\r\n');
 
     try {
-      const response = await fetch(targetUrl, {
+      // fetch 대신 obsidian.requestUrl을 사용하여 CORS 문제를 우회합니다.
+      const response = await obsidian.requestUrl({
+        url: targetUrl,
         method: "POST",
         headers: { 
           "Accept": "text/x-component, */*",
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-          "Origin": "https://nara-speller.co.kr",
-          "Referer": "https://nara-speller.co.kr/speller",
-          "Next-Action": "7f2acc76ef56592dba37ceb7bfdff1248517384d32"
+          // Content-Type에 boundary를 명시해야 합니다.
+          "Content-Type": `multipart/form-data; boundary=${boundary}`
+          // CORS 오류를 유발하던 Origin, Referer, Next-Action 헤더는 제거합니다.
         },
-        body: formData
+        body: requestBody
       });
       
-      const responseText = await response.text();
+      const responseText = response.text;
 
-      if (!response.ok) {
+      if (response.status < 200 || response.status >= 300) {
         console.error(
-            `Network response was not ok. Status: ${response.status} (${response.statusText})`,
+            `Network response was not ok. Status: ${response.status}`,
             "Response Text:", responseText.substring(0, 500)
         );
-        throw new Error(`Network error: ${response.status} ${response.statusText}.`);
+        throw new Error(`Network error: Status code ${response.status}.`);
       }
       
       let jsonForFirstPart = {"a":"$@1"}; 
