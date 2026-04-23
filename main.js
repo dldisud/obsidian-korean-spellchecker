@@ -3,11 +3,27 @@ const obsidian = require('obsidian');
 async function checkSpelling(text) {
   // Old speller handles max ~300 tokens per page; chunk to be safe
   const maxWords = 300;
-  const words = text.split(/\s+/);
+  const tokens = text.split(/(\s+)/);
   const chunks = [];
+  let currentChunk = '';
+  let wordCount = 0;
 
-  for (let i = 0; i < words.length; i += maxWords) {
-    chunks.push(words.slice(i, i + maxWords).join(' '));
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    currentChunk += token;
+    if (/\S/.test(token)) {
+      wordCount++;
+    }
+
+    if (wordCount >= maxWords) {
+      chunks.push(currentChunk);
+      currentChunk = '';
+      wordCount = 0;
+    }
+  }
+
+  if (currentChunk) {
+    chunks.push(currentChunk);
   }
 
   const aggregatedCorrections = [];
@@ -160,6 +176,7 @@ class CorrectionModal extends obsidian.Modal {
     this.editor = editor;
     this.currentPage = 0;
     this.correctionChunks = [];
+    this.userChoices = {};
     
     this.MAX_CORRECTIONS_PER_PAGE = 10;
   }
@@ -224,23 +241,40 @@ class CorrectionModal extends obsidian.Modal {
         item.createEl("br");
         item.createEl("b", { text: "수정:" });
 
+        let savedChoice = this.userChoices[globalIndex];
+        let hasMatchedOption = false;
+
         correction.corrected.forEach((option, optIndex) => {
             const radioId = `correction${globalIndex}_${optIndex}`;
             const radio = item.createEl("input", { type: "radio", attr: { name: `correction${globalIndex}`, value: option, id: radioId } });
+            if (savedChoice === option) {
+                radio.checked = true;
+                hasMatchedOption = true;
+            }
             item.createEl("label", { text: option, attr: { for: radioId } });
             radio.addEventListener("click", () => this.updatePreview());
         });
 
         const originalRadioId = `correction${globalIndex}_original`;
-        const radioOriginal = item.createEl("input", { type: "radio", attr: { name: `correction${globalIndex}`, value: correction.original, id: originalRadioId, checked: true } });
+        const radioOriginal = item.createEl("input", { type: "radio", attr: { name: `correction${globalIndex}`, value: correction.original, id: originalRadioId } });
+        if (savedChoice === correction.original || savedChoice === undefined) {
+            radioOriginal.checked = true;
+            hasMatchedOption = true;
+        }
         item.createEl("label", { text: "원본 유지", attr: { for: originalRadioId } });
         radioOriginal.addEventListener("click", () => this.updatePreview());
 
         const customDiv = item.createDiv({ cls: "correction-options" });
         const customRadioId = `correction${globalIndex}_custom`;
         const radioCustom = customDiv.createEl("input", { type: "radio", attr: { name: `correction${globalIndex}`, value: "custom", id: customRadioId } });
+        if (savedChoice !== undefined && !hasMatchedOption) {
+            radioCustom.checked = true;
+        }
         customDiv.createEl("label", { text: "직접 수정:", attr: { for: customRadioId } });
         const inputCustom = customDiv.createEl("input", { type: "text", attr: { id: `customCorrection${globalIndex}`, placeholder: "직접 수정 내용을 입력하세요" } });
+        if (savedChoice !== undefined && !hasMatchedOption) {
+            inputCustom.value = savedChoice;
+        }
         
         radioCustom.addEventListener("click", () => this.updatePreview());
         inputCustom.addEventListener("focus", () => radioCustom.checked = true);
@@ -301,6 +335,9 @@ class CorrectionModal extends obsidian.Modal {
         } else {
           correctionText = selectedOption;
         }
+
+        this.userChoices[globalIndex] = correctionText;
+
         const spanElement = this.contentEl.querySelector(`#preview_correction${globalIndex}`);
         if (spanElement) {
           spanElement.textContent = correctionText; 
@@ -311,17 +348,33 @@ class CorrectionModal extends obsidian.Modal {
   }
   
   applyCorrectionsHandler() {
-    const resultPreviewElement = this.contentEl.querySelector("#resultPreview");
-    if (!resultPreviewElement) {
-        this.editor.replaceRange(this.selectedText, this.start, this.end);
-        this.close();
-        return;
-    }
-    const tempDiv = resultPreviewElement.cloneNode(true);
-    tempDiv.querySelectorAll('span[id^="preview_correction"]').forEach(span => {
-        span.replaceWith(span.textContent || "");
+    let finalAppliedText = this.selectedText;
+
+    // First pass: replace original occurrences with unique placeholders
+    this.allCorrections.forEach((correction, globalIndex) => {
+        if (correction && typeof correction.original === 'string') {
+            finalAppliedText = replaceFirstOccurrenceWithPlaceholder(
+                finalAppliedText,
+                correction.original,
+                `{placeholder_apply_${globalIndex}}`
+            );
+        }
     });
-    const finalAppliedText = tempDiv.textContent || "";
+
+    // Second pass: replace placeholders with user choices (or original if no choice)
+    this.allCorrections.forEach((correction, globalIndex) => {
+        if (correction && typeof correction.original === 'string') {
+            let choice = this.userChoices[globalIndex];
+            if (choice === undefined) {
+                choice = correction.original;
+            }
+            finalAppliedText = finalAppliedText.replace(
+                `{placeholder_apply_${globalIndex}}`,
+                choice
+            );
+        }
+    });
+
     this.editor.replaceRange(finalAppliedText, this.start, this.end);
     this.close();
   }
