@@ -2,8 +2,11 @@ const obsidian = require('obsidian');
 
 async function checkSpelling(text) {
   // Old speller handles max ~300 tokens per page; chunk to be safe
-  // Normalize newlines to a single space so the API doesn't concatenate words across line breaks
-  text = text.replace(/(\r\n|\n)+/g, ' ');
+  // Normalize any whitespace run that contains a line break (\n, \r, \r\n, or
+  // several in a row for paragraph breaks) down to a single space. This keeps the
+  // API from concatenating the words on either side of a line break (which it would
+  // otherwise flag as a spacing error) while never producing double spaces.
+  text = text.replace(/\s*[\r\n]\s*/g, ' ');
   const maxWords = 300;
   const tokens = text.split(/(\s+)/);
   const chunks = [];
