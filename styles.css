@@ -37,13 +37,13 @@
    맞춤법 검사 모달
    ========================================================================= */
 .modal.korean-spellchecker-modal-el {
-  width: min(600px, 92vw);
+  width: min(760px, 92vw);
 }
 .korean-spellchecker-modal {
   display: flex;
   flex-direction: column;
   padding: 0;
-  max-height: min(80vh, 640px);
+  max-height: 85vh;
 }
 
 /* Header */
@@ -100,7 +100,8 @@
   white-space: pre-wrap;
   word-break: break-word;
   overflow-y: auto;
-  max-height: 130px;
+  min-height: 84px;
+  max-height: 22vh;
 }
 .korean-spellchecker-modal .ksp-arrow {
   display: grid;
@@ -125,6 +126,7 @@
 /* Correction cards */
 .korean-spellchecker-modal .ksp-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
