@@ -1,285 +1,463 @@
-/* 맞춤법 검사기 메인 모달 */
+/* =========================================================================
+   Korean Spellchecker — UI
+   All colors derive from Obsidian theme variables, so the plugin adapts to
+   the user's theme and accent color in both light and dark mode.
+   ========================================================================= */
+
+/* Shared header icon (both modals) */
+.ksp-ico {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-s);
+  color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 15%, transparent);
+}
+.ksp-ico .svg-icon {
+  width: 17px;
+  height: 17px;
+}
+.ksp-header-text { min-width: 0; }
+.ksp-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+.ksp-sub {
+  margin: 1px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+/* =========================================================================
+   맞춤법 검사 모달
+   ========================================================================= */
+.modal.korean-spellchecker-modal-el {
+  width: min(600px, 92vw);
+}
 .korean-spellchecker-modal {
   display: flex;
   flex-direction: column;
   padding: 0;
-  height: 85vh;
+  max-height: min(80vh, 640px);
 }
 
-/* 상단 원본/결과 미리보기 영역 */
-.korean-spellchecker-modal .preview-container {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr; /* [결과] [화살표] [미리보기] 3단 구성 */
-  gap: 12px;
-  align-items: stretch;
-  padding: 15px;
-  background: var(--background-secondary-alt);
+/* Header */
+.korean-spellchecker-modal .ksp-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px 14px;
   border-bottom: 1px solid var(--background-modifier-border);
 }
-
-.korean-spellchecker-modal .error-text,
-.korean-spellchecker-modal .result-preview {
-  padding: 12px;
-  border-radius: var(--radius-m);
-  white-space: pre-wrap;
-  overflow-y: auto;
-  max-height: 25vh; /* 미리보기 영역 최대 높이 */
-  background-color: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  line-height: 1.6;
+.korean-spellchecker-modal .ksp-count {
+  margin-left: auto;
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: var(--color-red);
+  background: color-mix(in srgb, var(--color-red) 13%, transparent);
+  font-variant-numeric: tabular-nums;
 }
 
-.korean-spellchecker-modal .arrow {
-  font-size: 1.5em;
-  color: var(--text-muted);
+/* Before / after preview */
+.korean-spellchecker-modal .ksp-preview {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 10px;
+  align-items: stretch;
+  padding: 14px 18px;
+  background: var(--background-secondary);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.korean-spellchecker-modal .ksp-pane-wrap {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.korean-spellchecker-modal .ksp-pane-label {
+  margin: 0 0 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.korean-spellchecker-modal .ksp-pane {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: var(--radius-m);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  font-size: 13.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-y: auto;
+  max-height: 130px;
+}
+.korean-spellchecker-modal .ksp-arrow {
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+}
+.korean-spellchecker-modal .ksp-arrow .svg-icon {
+  width: 20px;
+  height: 20px;
+}
+.korean-spellchecker-modal .ksp-err {
+  color: var(--color-red);
+  font-weight: 650;
+  text-decoration: underline wavy var(--color-red);
+  text-underline-offset: 3px;
+}
+.korean-spellchecker-modal .ksp-fix {
+  color: var(--color-green);
+  font-weight: 650;
+}
+
+/* Correction cards */
+.korean-spellchecker-modal .ksp-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 18px;
+}
+.korean-spellchecker-modal .ksp-card {
+  padding: 13px 14px 14px;
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+.korean-spellchecker-modal .ksp-card-head {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
 }
-
-/* 오류 단어 하이라이트 스타일 */
-.spell-correction-highlight {
+.korean-spellchecker-modal .ksp-card-idx {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  font-variant-numeric: tabular-nums;
+}
+.korean-spellchecker-modal .ksp-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--background-modifier-border);
+}
+.korean-spellchecker-modal .ksp-tag.is-spacing {
+  color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+}
+.korean-spellchecker-modal .ksp-orig {
+  margin-left: auto;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+}
+.korean-spellchecker-modal .ksp-orig s {
   color: var(--color-red);
-  background-color: var(--background-modifier-error);
-  font-weight: bold;
-  padding: 0.1em 0.2em;
-  border-radius: var(--radius-s);
+  font-weight: 600;
+  text-decoration-color: color-mix(in srgb, var(--color-red) 55%, transparent);
 }
 
-/* 수정 제안 리스트 영역 */
-.korean-spellchecker-modal .content {
-  padding: 15px;
-  line-height: 1.6;
-  overflow-y: auto;
-  flex-grow: 1;
+/* Choice chips */
+.korean-spellchecker-modal .ksp-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
 }
-
-.korean-spellchecker-modal .correction-item {
-  margin-bottom: 18px;
-  padding: 12px;
-  background: var(--background-secondary);
-  border-radius: var(--radius-m);
+.korean-spellchecker-modal .ksp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  line-height: 1;
+  padding: 8px 13px;
+  height: auto;
+  cursor: pointer;
+  border-radius: 8px;
+  color: var(--text-normal);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: none;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
 }
-
-.korean-spellchecker-modal .correction-item span {
-  color: var(--text-accent);
-  font-weight: bold;
+.korean-spellchecker-modal .ksp-chip:hover {
+  border-color: var(--interactive-accent);
+  background: var(--background-primary);
 }
-
-.korean-spellchecker-modal .correction-item pre {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  background-color: var(--background-primary);
-  padding: 10px;
-  border-radius: var(--radius-s);
-  margin-top: 8px;
-  font-size: 0.9em;
+.korean-spellchecker-modal .ksp-chip.is-selected {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  font-weight: 600;
+}
+.korean-spellchecker-modal .ksp-chip.is-keep {
   color: var(--text-muted);
 }
-
-.korean-spellchecker-modal .correction-item label {
-  margin: 0 10px 0 2px;
-  display: inline-block;
-  vertical-align: middle;
+.korean-spellchecker-modal .ksp-chip.is-keep.is-selected {
+  color: var(--text-normal);
+  background: var(--background-modifier-border);
+  border-color: var(--text-faint);
+}
+.korean-spellchecker-modal .ksp-chip.is-custom {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+.korean-spellchecker-modal .ksp-chip.is-custom.is-selected {
+  color: var(--text-normal);
+  background: var(--background-modifier-border);
+  border-style: solid;
+  border-color: var(--text-faint);
+  font-weight: 600;
+}
+.korean-spellchecker-modal .ksp-chip-check {
+  display: inline-flex;
+}
+.korean-spellchecker-modal .ksp-chip-check .svg-icon {
+  width: 13px;
+  height: 13px;
 }
 
-.korean-spellchecker-modal .correction-item input[type="radio"] {
-  margin-right: 2px;
-  vertical-align: middle;
+/* Custom input */
+.korean-spellchecker-modal .ksp-custom {
+  display: none;
+  margin-top: 9px;
+}
+.korean-spellchecker-modal .ksp-custom.show {
+  display: block;
+}
+.korean-spellchecker-modal .ksp-custom input {
+  width: 100%;
+  font-size: 13px;
+  padding: 8px 11px;
 }
 
-.korean-spellchecker-modal .correction-options {
-  margin-top: 5px;
+/* Help line */
+.korean-spellchecker-modal .ksp-help {
+  display: flex;
+  gap: 7px;
+  margin-top: 11px;
+  padding-top: 11px;
+  border-top: 1px dashed var(--background-modifier-border);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.korean-spellchecker-modal .ksp-help-ico {
+  display: inline-flex;
+  flex: none;
+  margin-top: 1px;
+  color: var(--text-faint);
+}
+.korean-spellchecker-modal .ksp-help-ico .svg-icon {
+  width: 14px;
+  height: 14px;
 }
 
-.korean-spellchecker-modal .correction-options input[type="text"] {
-  width: 50%;
-  margin-left: 5px;
-}
-
-/* 하단 버튼 영역 */
-.korean-spellchecker-modal .korean-spellchecker-controls {
+/* Footer */
+.korean-spellchecker-modal .ksp-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
   border-top: 1px solid var(--background-modifier-border);
-  padding-top: 15px;
-  margin-top: 10px;
+  background: var(--background-secondary);
 }
-.korean-spellchecker-modal .korean-spellchecker-controls .setting-item-control {
-  justify-content: flex-end; /* 버튼들을 오른쪽으로 정렬 */
+.korean-spellchecker-modal .ksp-pager {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-.korean-spellchecker-modal .korean-spellchecker-controls .setting-item-name {
-  flex-grow: 0;
-  margin-right: auto; /* 페이지 정보는 왼쪽으로 */
+.korean-spellchecker-modal .ksp-pbtn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  border-radius: 8px;
+  color: var(--text-normal);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: none;
+}
+.korean-spellchecker-modal .ksp-pbtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.korean-spellchecker-modal .ksp-pbtn .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.korean-spellchecker-modal .ksp-pinfo {
+  min-width: 44px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.korean-spellchecker-modal .ksp-apply {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 9px 20px;
+  cursor: pointer;
+  border-radius: 8px;
+  border: none;
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+.korean-spellchecker-modal .ksp-apply:hover {
+  background: var(--interactive-accent-hover);
+}
+.korean-spellchecker-modal .ksp-apply-ico {
+  display: inline-flex;
+}
+.korean-spellchecker-modal .ksp-apply-ico .svg-icon {
+  width: 15px;
+  height: 15px;
 }
 
-/* 모바일 화면 대응 */
+/* Mobile: stack the before/after preview vertically */
 @media (max-width: 767px) {
-  .korean-spellchecker-modal .preview-container {
-    grid-template-columns: 1fr; /* 세로 1단으로 변경 */
-    grid-template-rows: auto auto auto;
+  .korean-spellchecker-modal .ksp-preview {
+    grid-template-columns: 1fr;
   }
-  .korean-spellchecker-modal .arrow {
-bugfix/proper-noun-exclusion
-    font-size: 1.5em;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  /* 오류 단어 하이라이트 스타일 */
-  .spell-correction-highlight {
-    color: var(--color-red);
-    background-color: var(--background-modifier-error);
-    font-weight: bold;
-    padding: 0.1em 0.2em;
-    border-radius: var(--radius-s);
-  }
-  
-  /* 수정 제안 리스트 영역 */
-  .korean-spellchecker-modal .content {
-    padding: 15px;
-    line-height: 1.6;
-    overflow-y: auto;
-    flex-grow: 1;
-  }
-  
-  .korean-spellchecker-modal .correction-item {
-    margin-bottom: 18px;
-    padding: 12px;
-    background: var(--background-secondary);
-    border-radius: var(--radius-m);
-  }
-  
-  .korean-spellchecker-modal .correction-item span {
-    color: var(--text-accent);
-    font-weight: bold;
-  }
-  
-  .korean-spellchecker-modal .correction-item pre {
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    background-color: var(--background-primary);
-    padding: 10px;
-    border-radius: var(--radius-s);
-    margin-top: 8px;
-    font-size: 0.9em;
-    color: var(--text-muted);
-  }
-  
-  .korean-spellchecker-modal .correction-item label {
-    margin: 0 10px 0 2px;
-    display: inline-block;
-    vertical-align: middle;
-  }
-  
-  .korean-spellchecker-modal .correction-item input[type="radio"] {
-    margin-right: 2px;
-    vertical-align: middle;
-  }
-  
-  .korean-spellchecker-modal .correction-options {
-    margin-top: 5px;
-  }
-  
-  .korean-spellchecker-modal .correction-options input[type="text"] {
-    width: 50%;
-    margin-left: 5px;
-  }
-  
-  /* 하단 버튼 영역 */
-  .korean-spellchecker-modal .korean-spellchecker-controls {
-    border-top: 1px solid var(--background-modifier-border);
-    padding-top: 15px;
-    margin-top: 10px;
-  }
-  .korean-spellchecker-modal .korean-spellchecker-controls .setting-item-control {
-    justify-content: flex-end; /* 버튼들을 오른쪽으로 정렬 */
-  }
-  .korean-spellchecker-modal .korean-spellchecker-controls .setting-item-name {
-    flex-grow: 0;
-    margin-right: auto; /* 페이지 정보는 왼쪽으로 */
-  }
-  
-  /* 모바일 화면 대응 */
-  @media (max-width: 767px) {
-    .korean-spellchecker-modal .preview-container {
-      grid-template-columns: 1fr; /* 세로 1단으로 변경 */
-      grid-template-rows: auto auto auto;
-    }
-    .korean-spellchecker-modal .arrow {
-      transform: rotate(90deg);
-      padding: 8px 0;
-    }
-  }
-  
-  /* 고유명사 관리 모달 */
-  .custom-noun-modal .custom-noun-list-container {
-    max-height: 250px;
-    overflow-y: auto;
-    margin-bottom: 15px;
-  }
-  .custom-noun-modal ul {
-    list-style-type: none;
-    padding: 0;
-  }
-  .custom-noun-modal li {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-    padding: 8px;
-    background-color: var(--background-secondary);
-    border-radius: var(--radius-s);
-  }
-
-  /* 상태 표시줄 버튼 스타일 */
-  .korean-spellchecker-statusbar {
-    padding: 0 10px;
-    background-color: var(--interactive-accent);
-    color: var(--text-on-accent);
-    border-radius: var(--radius-s);
-    cursor: pointer;
-  }
-
-  .korean-spellchecker-statusbar:hover {
-    background-color: var(--interactive-accent-hover);
-  }
-
+  .korean-spellchecker-modal .ksp-arrow {
     transform: rotate(90deg);
-    padding: 8px 0;
+    padding: 2px 0;
+  }
+  .korean-spellchecker-modal .ksp-orig {
+    max-width: 60%;
   }
 }
 
-/* 고유명사 관리 모달 */
-.custom-noun-modal .custom-noun-list-container {
-  max-height: 250px;
-  overflow-y: auto;
-  margin-bottom: 15px;
+/* =========================================================================
+   고유명사 관리 모달
+   ========================================================================= */
+.modal.custom-noun-modal-el {
+  width: min(460px, 92vw);
 }
-.custom-noun-modal ul {
-  list-style-type: none;
+.custom-noun-modal {
   padding: 0;
 }
-.custom-noun-modal li {
+.custom-noun-modal .ksp-noun-head {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-  padding: 8px;
-  background-color: var(--background-secondary);
-  border-radius: var(--radius-s);
+  gap: 10px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.custom-noun-modal .ksp-noun-body {
+  padding: 14px 18px 16px;
+}
+.custom-noun-modal .ksp-noun-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.custom-noun-modal .ksp-noun-empty {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.custom-noun-modal .ksp-noun-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+}
+.custom-noun-modal .ksp-noun-chip button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-faint);
+  background: transparent;
+  box-shadow: none;
+}
+.custom-noun-modal .ksp-noun-chip button:hover {
+  color: var(--color-red);
+  background: color-mix(in srgb, var(--color-red) 15%, transparent);
+}
+.custom-noun-modal .ksp-noun-chip button .svg-icon {
+  width: 12px;
+  height: 12px;
+}
+.custom-noun-modal .ksp-noun-input {
+  display: flex;
+  gap: 8px;
+}
+.custom-noun-modal .ksp-noun-input input {
+  flex: 1;
+  font-size: 13.5px;
+}
+.custom-noun-modal .ksp-noun-input button {
+  flex: none;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+.custom-noun-modal .ksp-noun-input button:hover {
+  background: var(--interactive-accent-hover);
 }
 
-/* 상태 표시줄 버튼 스타일 */
+/* =========================================================================
+   상태 표시줄 버튼
+   ========================================================================= */
 .korean-spellchecker-statusbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 0 10px;
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
   border-radius: var(--radius-s);
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
   cursor: pointer;
 }
-
 .korean-spellchecker-statusbar:hover {
-  background-color: var(--interactive-accent-hover);
+  background: var(--interactive-accent-hover);
 }
-
+.korean-spellchecker-statusbar .korean-spellchecker-statusbar-icon {
+  display: inline-flex;
+}
+.korean-spellchecker-statusbar .korean-spellchecker-statusbar-icon .svg-icon {
+  width: 14px;
+  height: 14px;
+}

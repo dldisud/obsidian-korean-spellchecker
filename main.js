@@ -134,6 +134,16 @@ function decodeHtmlEntities(text) {
     .replace(/'/g, "'");
 }
 
+// Derive a short error-type tag from the API's help text so each card can be labelled.
+function inferErrorType(help) {
+  const h = help || '';
+  if (h.includes('띄어') || h.includes('붙여')) return { label: '띄어쓰기', spacing: true };
+  if (h.includes('표준어')) return { label: '표준어', spacing: false };
+  if (h.includes('문장 부호') || h.includes('문장부호') || h.includes('구두점')) return { label: '문장부호', spacing: false };
+  if (h.includes('맞춤법') || h.includes('표기')) return { label: '맞춤법', spacing: false };
+  return { label: '교정', spacing: false };
+}
+
 function replaceFirstOccurrenceWithPlaceholder(text, search, placeholder) {
   const index = text.indexOf(search);
   if (index === -1) return text;
@@ -158,7 +168,8 @@ function highlightOriginalTextWithPlaceholders(text, correctionsInPage, type, ba
   correctionsInPage.forEach((correction, localIndex) => {
     const globalIndex = baseIndex + localIndex;
     if (correction && typeof correction.original === 'string') {
-        const span = `<span id="${type}_correction${globalIndex}" style="color: var(--color-red); font-weight: bold;">${correction.original}</span>`;
+        const cls = type === 'error' ? 'ksp-err' : 'ksp-preview-word';
+        const span = `<span id="${type}_correction${globalIndex}" class="${cls}">${correction.original}</span>`;
         tempText = tempText.replace(
         `{placeholder_${type}_${globalIndex}}`,
         span
@@ -182,23 +193,35 @@ class CorrectionModal extends obsidian.Modal {
     this.currentPage = 0;
     this.correctionChunks = [];
     this.userChoices = {};
-    
+    this.customMode = {};
+
     this.MAX_CORRECTIONS_PER_PAGE = 10;
   }
 
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass('korean-spellchecker-modal');
-    
+    this.modalEl.addClass('korean-spellchecker-modal-el');
+    this.titleEl.style.display = 'none'; // use our own custom header instead
+
     if (this.allCorrections.length === 0) {
       this.close();
       return;
     }
 
+    // Default each error to its first suggestion; the before/after preview makes
+    // every pending change visible before the user hits 적용.
+    this.allCorrections.forEach((c, i) => {
+      if (this.userChoices[i] !== undefined) return;
+      this.userChoices[i] = (c && Array.isArray(c.corrected) && c.corrected.length > 0)
+        ? c.corrected[0]
+        : (c ? c.original : '');
+    });
+
     for (let i = 0; i < this.allCorrections.length; i += this.MAX_CORRECTIONS_PER_PAGE) {
       this.correctionChunks.push(this.allCorrections.slice(i, i + this.MAX_CORRECTIONS_PER_PAGE));
     }
-    
+
     this.renderContent();
   }
 
@@ -217,141 +240,157 @@ class CorrectionModal extends obsidian.Modal {
         return;
     }
     const baseIndex = this.currentPage * this.MAX_CORRECTIONS_PER_PAGE;
-    
-    const errorTextHighlighted = highlightOriginalTextWithPlaceholders(this.selectedText, currentCorrections, "error", baseIndex);
-    const resultPreviewHighlighted = highlightOriginalTextWithPlaceholders(this.selectedText, currentCorrections, "preview", baseIndex);
-    
-    // Header (모달 타이틀로 대체)
-    this.titleEl.textContent = `맞춤법 검사 결과 (${this.currentPage + 1}/${this.correctionChunks.length})`;
 
-    // Preview Container
-    const previewContainer = contentEl.createDiv({ cls: "preview-container" });
-    const errorTextDiv = previewContainer.createDiv({ cls: "error-text" });
-    errorTextDiv.innerHTML = errorTextHighlighted;
-    previewContainer.createDiv({ cls: "arrow", text: "▶" });
-    const resultPreviewDiv = previewContainer.createDiv({ cls: "result-preview", attr: { id: "resultPreview" } });
-    resultPreviewDiv.innerHTML = resultPreviewHighlighted;
-    
-    // Content
-    const content = contentEl.createDiv({ cls: "content" });
-    const correctionUI = content.createDiv({ cls: "correction-list", attr: { id: "correctionUI" } });
+    // --- Header ---
+    const header = contentEl.createDiv({ cls: 'ksp-header' });
+    const headerIcon = header.createDiv({ cls: 'ksp-ico' });
+    obsidian.setIcon(headerIcon, 'spell-check');
+    const headerText = header.createDiv({ cls: 'ksp-header-text' });
+    headerText.createEl('p', { cls: 'ksp-title', text: '맞춤법 검사 결과' });
+    headerText.createEl('p', { cls: 'ksp-sub', text: '제안을 고른 뒤 적용하세요' });
+    header.createDiv({ cls: 'ksp-count', text: `오류 ${this.allCorrections.length}` });
 
+    // --- Before / After preview ---
+    const preview = contentEl.createDiv({ cls: 'ksp-preview' });
+    const beforeWrap = preview.createDiv({ cls: 'ksp-pane-wrap' });
+    beforeWrap.createEl('p', { cls: 'ksp-pane-label', text: '원본' });
+    this.beforeEl = beforeWrap.createDiv({ cls: 'ksp-pane' });
+    this.beforeEl.innerHTML = highlightOriginalTextWithPlaceholders(this.selectedText, currentCorrections, 'error', baseIndex);
+    const arrow = preview.createDiv({ cls: 'ksp-arrow' });
+    obsidian.setIcon(arrow, 'arrow-right');
+    const afterWrap = preview.createDiv({ cls: 'ksp-pane-wrap' });
+    afterWrap.createEl('p', { cls: 'ksp-pane-label', text: '수정본' });
+    this.afterEl = afterWrap.createDiv({ cls: 'ksp-pane' });
+    this.afterEl.innerHTML = highlightOriginalTextWithPlaceholders(this.selectedText, currentCorrections, 'preview', baseIndex);
+
+    // --- Correction cards ---
+    const list = contentEl.createDiv({ cls: 'ksp-list' });
     currentCorrections.forEach((correction, localIndex) => {
         const globalIndex = baseIndex + localIndex;
         if (!correction || typeof correction.original !== 'string' || !Array.isArray(correction.corrected)) return;
-        
-        const item = correctionUI.createDiv({ cls: "correction-item" });
-        item.createEl("b", { text: `오류 ${localIndex + 1}:` });
-        item.createEl("span", { text: ` ${correction.original}` });
-        item.createEl("br");
-        item.createEl("b", { text: "수정:" });
 
-        let savedChoice = this.userChoices[globalIndex];
-        let hasMatchedOption = false;
+        const card = list.createDiv({ cls: 'ksp-card' });
 
-        correction.corrected.forEach((option, optIndex) => {
-            const radioId = `correction${globalIndex}_${optIndex}`;
-            const radio = item.createEl("input", { type: "radio", attr: { name: `correction${globalIndex}`, value: option, id: radioId } });
-            if (savedChoice === option) {
-                radio.checked = true;
-                hasMatchedOption = true;
-            }
-            item.createEl("label", { text: option, attr: { for: radioId } });
-            radio.addEventListener("click", () => this.updatePreview());
+        const cardHead = card.createDiv({ cls: 'ksp-card-head' });
+        cardHead.createDiv({ cls: 'ksp-card-idx', text: String(globalIndex + 1) });
+        const type = inferErrorType(correction.help);
+        cardHead.createEl('span', { cls: `ksp-tag${type.spacing ? ' is-spacing' : ''}`, text: type.label });
+        const orig = cardHead.createEl('span', { cls: 'ksp-orig' });
+        orig.createEl('s', { text: correction.original });
+
+        const choices = card.createDiv({ cls: 'ksp-choices' });
+        const customWrap = card.createDiv({ cls: 'ksp-custom' });
+        const customInput = customWrap.createEl('input', { type: 'text', attr: { placeholder: '직접 수정 내용을 입력하세요' } });
+        customInput.addEventListener('input', () => {
+            this.userChoices[globalIndex] = customInput.value.trim() || correction.original;
+            this.updatePreview();
         });
 
-        const originalRadioId = `correction${globalIndex}_original`;
-        const radioOriginal = item.createEl("input", { type: "radio", attr: { name: `correction${globalIndex}`, value: correction.original, id: originalRadioId } });
-        if (savedChoice === correction.original || savedChoice === undefined) {
-            radioOriginal.checked = true;
-            hasMatchedOption = true;
-        }
-        item.createEl("label", { text: "원본 유지", attr: { for: originalRadioId } });
-        radioOriginal.addEventListener("click", () => this.updatePreview());
+        this.renderChoices(choices, customWrap, customInput, correction, globalIndex);
 
-        const customDiv = item.createDiv({ cls: "correction-options" });
-        const customRadioId = `correction${globalIndex}_custom`;
-        const radioCustom = customDiv.createEl("input", { type: "radio", attr: { name: `correction${globalIndex}`, value: "custom", id: customRadioId } });
-        if (savedChoice !== undefined && !hasMatchedOption) {
-            radioCustom.checked = true;
-        }
-        customDiv.createEl("label", { text: "직접 수정:", attr: { for: customRadioId } });
-        const inputCustom = customDiv.createEl("input", { type: "text", attr: { id: `customCorrection${globalIndex}`, placeholder: "직접 수정 내용을 입력하세요" } });
-        if (savedChoice !== undefined && !hasMatchedOption) {
-            inputCustom.value = savedChoice;
-        }
-        
-        radioCustom.addEventListener("click", () => this.updatePreview());
-        inputCustom.addEventListener("focus", () => radioCustom.checked = true);
-        inputCustom.addEventListener("input", () => this.updatePreview());
-        
-        item.createEl("pre", { text: correction.help || "" });
-    });
-
-    // Pagination & Actions
-    const controlsEl = contentEl.createDiv({ cls: 'modal-button-container' });
-
-    const prevButton = controlsEl.createEl("button", { text: "이전" });
-    prevButton.disabled = this.currentPage === 0;
-    prevButton.addEventListener("click", () => {
-        if (this.currentPage > 0) {
-            this.currentPage--;
-            this.renderContent();
+        if (correction.help) {
+            const help = card.createDiv({ cls: 'ksp-help' });
+            const helpIcon = help.createSpan({ cls: 'ksp-help-ico' });
+            obsidian.setIcon(helpIcon, 'info');
+            help.createEl('span', { text: correction.help });
         }
     });
 
-    controlsEl.createEl("span", { cls: "pagination-info", text: `${this.currentPage + 1} / ${this.correctionChunks.length}` });
+    // --- Footer ---
+    const footer = contentEl.createDiv({ cls: 'ksp-footer' });
+    if (this.correctionChunks.length > 1) {
+        const pager = footer.createDiv({ cls: 'ksp-pager' });
+        const prevButton = pager.createEl('button', { cls: 'ksp-pbtn', attr: { 'aria-label': '이전' } });
+        obsidian.setIcon(prevButton, 'chevron-left');
+        prevButton.disabled = this.currentPage === 0;
+        prevButton.addEventListener('click', () => {
+            if (this.currentPage > 0) { this.currentPage--; this.renderContent(); }
+        });
+        pager.createEl('span', { cls: 'ksp-pinfo', text: `${this.currentPage + 1} / ${this.correctionChunks.length}` });
+        const nextButton = pager.createEl('button', { cls: 'ksp-pbtn', attr: { 'aria-label': '다음' } });
+        obsidian.setIcon(nextButton, 'chevron-right');
+        nextButton.disabled = this.currentPage === this.correctionChunks.length - 1;
+        nextButton.addEventListener('click', () => {
+            if (this.currentPage < this.correctionChunks.length - 1) { this.currentPage++; this.renderContent(); }
+        });
+    }
 
-    const nextButton = controlsEl.createEl("button", { text: "다음" });
-    nextButton.disabled = this.currentPage === this.correctionChunks.length - 1;
-    nextButton.addEventListener("click", () => {
-        if (this.currentPage < this.correctionChunks.length - 1) {
-            this.currentPage++;
-            this.renderContent();
+    const applyButton = footer.createEl('button', { cls: 'ksp-apply' });
+    const applyIcon = applyButton.createSpan({ cls: 'ksp-apply-ico' });
+    obsidian.setIcon(applyIcon, 'check');
+    applyButton.createSpan({ text: '적용' });
+    applyButton.addEventListener('click', () => this.applyCorrectionsHandler());
+
+    this.updatePreview();
+  }
+
+  renderChoices(container, customWrap, customInput, correction, globalIndex) {
+    container.empty();
+    const current = this.userChoices[globalIndex];
+    const isCustom = !!this.customMode[globalIndex];
+
+    const makeChip = (label, opts = {}) => {
+        let cls = 'ksp-chip';
+        if (opts.keep) cls += ' is-keep';
+        if (opts.custom) cls += ' is-custom';
+        if (opts.selected) cls += ' is-selected';
+        const chip = container.createEl('button', { cls });
+        if (opts.selected && !opts.custom) {
+            const check = chip.createSpan({ cls: 'ksp-chip-check' });
+            obsidian.setIcon(check, 'check');
         }
+        chip.createSpan({ text: label });
+        return chip;
+    };
+
+    correction.corrected.forEach((option) => {
+        const chip = makeChip(option, { selected: !isCustom && current === option });
+        chip.addEventListener('click', () => this.selectChoice(container, customWrap, customInput, correction, globalIndex, option, false));
     });
-    
-    // Spacer to push apply button to the right
-    controlsEl.createDiv({ cls: 'spacer' });
 
-    const applyButton = controlsEl.createEl("button", { text: "적용", cls: "mod-cta" });
-    applyButton.addEventListener("click", () => this.applyCorrectionsHandler());
+    const keepChip = makeChip('원본 유지', { keep: true, selected: !isCustom && current === correction.original });
+    keepChip.addEventListener('click', () => this.selectChoice(container, customWrap, customInput, correction, globalIndex, correction.original, false));
 
-    this.updatePreview(); 
+    const customChip = makeChip('직접 수정', { custom: true, selected: isCustom });
+    customChip.addEventListener('click', () => this.selectChoice(container, customWrap, customInput, correction, globalIndex, null, true));
+
+    customWrap.toggleClass('show', isCustom);
+    if (isCustom) customInput.value = current === correction.original ? '' : current;
+  }
+
+  selectChoice(container, customWrap, customInput, correction, globalIndex, value, custom) {
+    if (custom) {
+        this.customMode[globalIndex] = true;
+        this.userChoices[globalIndex] = customInput.value.trim() || correction.original;
+        this.renderChoices(container, customWrap, customInput, correction, globalIndex);
+        customInput.focus();
+    } else {
+        this.customMode[globalIndex] = false;
+        this.userChoices[globalIndex] = value;
+        this.renderChoices(container, customWrap, customInput, correction, globalIndex);
+    }
+    this.updatePreview();
   }
 
   updatePreview() {
     const currentCorrections = this.correctionChunks[this.currentPage];
-    if (currentCorrections) {
-      const baseIndex = this.currentPage * this.MAX_CORRECTIONS_PER_PAGE;
-      currentCorrections.forEach((correction, localIndex) => {
+    if (!currentCorrections || !this.afterEl) return;
+    const baseIndex = this.currentPage * this.MAX_CORRECTIONS_PER_PAGE;
+    currentCorrections.forEach((correction, localIndex) => {
         const globalIndex = baseIndex + localIndex;
         if (!correction || typeof correction.original !== 'string') return;
-    
-        const selectedOptionElement = this.contentEl.querySelector(`input[name="correction${globalIndex}"]:checked`);
-        const originalTextForComparison = correction.original;
-        const selectedOption = selectedOptionElement ? selectedOptionElement.value : originalTextForComparison;
-    
-        const customTextElement = this.contentEl.querySelector(`#customCorrection${globalIndex}`);
-        const customText = customTextElement ? customTextElement.value.trim() : "";
-        let correctionText;
-        if (selectedOption === "custom") {
-          correctionText = customText || originalTextForComparison;
-        } else {
-          correctionText = selectedOption;
-        }
 
-        this.userChoices[globalIndex] = correctionText;
+        let choice = this.userChoices[globalIndex];
+        if (choice === undefined) choice = correction.original;
 
-        const spanElement = this.contentEl.querySelector(`#preview_correction${globalIndex}`);
+        const spanElement = this.afterEl.querySelector(`#preview_correction${globalIndex}`);
         if (spanElement) {
-          spanElement.textContent = correctionText; 
-          spanElement.style.color = correctionText === originalTextForComparison ? "var(--color-red)" : "var(--color-blue)";
+            spanElement.textContent = choice;
+            spanElement.classList.toggle('ksp-fix', choice !== correction.original);
         }
-      });
-    }
+    });
   }
-  
+
   applyCorrectionsHandler() {
     let finalAppliedText = this.selectedText;
 
@@ -391,11 +430,13 @@ class SpellingPlugin extends obsidian.Plugin {
 
   async onload() {
     const statusBarItemEl = this.addStatusBarItem();
-    statusBarItemEl.setText('맞춤법 검사');
     statusBarItemEl.addClass('korean-spellchecker-statusbar');
+    const statusIcon = statusBarItemEl.createSpan({ cls: 'korean-spellchecker-statusbar-icon' });
+    obsidian.setIcon(statusIcon, 'spell-check');
+    statusBarItemEl.createSpan({ text: '맞춤법 검사' });
 
     // 6. Sentence case 적용
-    this.addRibbonIcon("han-spellchecker", "Check spelling", () => this.runSpellCheck());
+    this.addRibbonIcon("spell-check", "Check spelling", () => this.runSpellCheck());
 
     this.addCommand({
       id: "check-spelling",
@@ -527,24 +568,33 @@ class CustomNounModal extends obsidian.Modal {
     const {contentEl} = this;
     contentEl.empty();
     contentEl.addClass('custom-noun-modal');
-    this.titleEl.textContent = '고유명사 관리';
+    this.modalEl.addClass('custom-noun-modal-el');
+    this.titleEl.style.display = 'none'; // use our own custom header instead
 
-    const listContainerEl = contentEl.createDiv({ cls: 'custom-noun-list-container' });
+    const header = contentEl.createDiv({ cls: 'ksp-noun-head' });
+    const headerIcon = header.createDiv({ cls: 'ksp-ico' });
+    obsidian.setIcon(headerIcon, 'tags');
+    const headerText = header.createDiv({ cls: 'ksp-header-text' });
+    headerText.createEl('h3', { cls: 'ksp-title', text: '고유명사 관리' });
+    headerText.createEl('p', { cls: 'ksp-sub', text: '여기 등록한 단어는 맞춤법 검사에서 제외됩니다' });
+
+    const body = contentEl.createDiv({ cls: 'ksp-noun-body' });
+    const listContainerEl = body.createDiv({ cls: 'ksp-noun-chips' });
 
     const renderList = () => {
         listContainerEl.empty();
         if (this.plugin.customNouns.size === 0) {
-            listContainerEl.createEl('p', {text: '등록된 고유명사가 없습니다.'});
+            listContainerEl.createEl('p', { cls: 'ksp-noun-empty', text: '아직 등록된 고유명사가 없습니다.' });
         } else {
-            const ul = listContainerEl.createEl('ul');
             Array.from(this.plugin.customNouns).sort().forEach(noun => {
-                const li = ul.createEl('li');
-                li.createSpan({text: noun});
-                const deleteButton = li.createEl('button', {text: '삭제', cls: 'mod-warning'});
+                const chip = listContainerEl.createDiv({ cls: 'ksp-noun-chip' });
+                chip.createSpan({ text: noun });
+                const deleteButton = chip.createEl('button', { attr: { 'aria-label': `${noun} 삭제` } });
+                obsidian.setIcon(deleteButton, 'x');
                 deleteButton.onclick = async () => {
                     this.plugin.customNouns.delete(noun);
                     await this.plugin.saveSettings();
-                    renderList(); 
+                    renderList();
                 };
             });
         }
@@ -552,10 +602,10 @@ class CustomNounModal extends obsidian.Modal {
 
     renderList();
 
-    const inputGroup = contentEl.createDiv({ cls: 'custom-noun-input-group' });
+    const inputGroup = body.createDiv({ cls: 'ksp-noun-input' });
     const inputEl = inputGroup.createEl('input', {type: 'text', placeholder: '새 고유명사 추가'});
-    const addButton = inputGroup.createEl('button', {text: '추가', cls: 'mod-cta'});
-    
+    const addButton = inputGroup.createEl('button', {text: '추가'});
+
     const addNounAction = async () => {
         const newNoun = inputEl.value.trim();
         if (newNoun) {
